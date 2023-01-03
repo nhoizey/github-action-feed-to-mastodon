@@ -1,0 +1,11 @@
+name: Test "JSON Feed to Mastodon"
+on:
+  workflow_dispatch:
+
+jobs:
+  Mastodon:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: JSON Feed to Mastodon
+        uses: nhoizey/github-action-jsonfeed-to-mastodon@v1.0.0-alpha.1
