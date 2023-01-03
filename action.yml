@@ -14,9 +14,9 @@ inputs:
   mastodonToken:
     description: "Your access token for the Mastodon API, get it from /settings/applications/new"
     required: true
-  allowMultipleToots:
-    description: "Can the same item be tooted multiple times"
-    default: false
+  nbTootsPerItem:
+    description: "Number of toots that can be created from the same item"
+    default: 1
   minutesBetweenToots:
     description: "Delay (in minutes) between any toot from this feed (default: 1 day)"
     default: 1440
