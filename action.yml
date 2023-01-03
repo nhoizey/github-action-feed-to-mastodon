@@ -46,14 +46,17 @@ runs:
 
     - name: Install dependencies 📦
       run: npm ci
+      shell: bash
 
     - name: JSON Feed to Mastodon 🦣
       env:
         RUNNER_TEMPORARY_DIRECTORY: ${{ runner.temp }}
       run: node ./dist/index.js >> $GITHUB_STEP_SUMMARY
+      shell: bash
 
     - name: Pull any changes 📥
       run: git pull
+      shell: bash
 
     - name: Commit and push 📤
       uses: stefanzweifel/git-auto-commit-action@v4
