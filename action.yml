@@ -17,10 +17,10 @@ inputs:
   nbTootsPerItem:
     description: "Number of toots that can be created from the same item"
     default: 1
-  minutesBetweenToots:
+  globalDelayToots:
     description: "Delay (in minutes) between any toot from this feed (default: 1 day)"
     default: 1440
-  minutesBetweenTootsForSameItem:
+  delayTootsSameItem:
     description: "Delay (in minutes) between any toot from this feed for the same item (default: 90 days)"
     default: 129600
   cacheFile:

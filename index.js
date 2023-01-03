@@ -10,7 +10,7 @@ async function run() {
     const feedUrl = core.getInput("feedUrl", { required: true });
     // const mastodonInstance = core.getInput("mastodonInstance", { required: true });
     // const mastodonToken = core.getInput("mastodonToken", { required: true });
-    const minutesBetweenToots = core.getInput("minutesBetweenToots");
+    const globalDelayToots = core.getInput("globalDelayToots");
     const cacheTimestampFile = core.getInput("cacheTimestampFile");
 
     // Check if required parameters are set
@@ -30,10 +30,7 @@ async function run() {
     // Get values from existing caches
     const jsonTimestamp = require(cacheTimestampFile);
 
-    if (
-      Date.now() <
-      jsonTimestamp.timestamp + minutesBetweenToots * 60 * 1000
-    ) {
+    if (Date.now() < jsonTimestamp.timestamp + globalDelayToots * 60 * 1000) {
       core.info(`Too soon…`);
       return;
     }
