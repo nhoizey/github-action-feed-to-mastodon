@@ -189,10 +189,8 @@ const processFeed = async (feedUrl) => {
   const mastodonInstance = core.getInput("mastodonInstance", {
     required: true,
   });
-  const allowMultipleToots = core.getBooleanInput("allowMultipleToots");
-  const minutesBetweenTootsForSameItem = core.getInput(
-    "minutesBetweenTootsForSameItem"
-  );
+  const nbTootsPerItem = core.getInput("nbTootsPerItem");
+  const delayTootsSameItem = core.getInput("delayTootsSameItem");
   const cacheFile = core.getInput("cacheFile");
   const cacheTimestampFile = core.getInput("cacheTimestampFile");
 
@@ -213,10 +211,6 @@ const processFeed = async (feedUrl) => {
     if (Object.prototype.hasOwnProperty.call(jsonCache, item.url)) {
       const existingToots = [...jsonCache[item.url].toots];
       let lastTootTimestamp = jsonCache[item.url].lastTootTimestamp;
-      // Initialize lastTootTimestamp for items already with some toots
-      if (lastTootTimestamp === undefined && existingToots.length > 0) {
-        lastTootTimestamp = Date.now();
-      }
       // Update item content
       jsonCache[item.url] = item;
       // Restore existing toots
@@ -230,10 +224,10 @@ const processFeed = async (feedUrl) => {
     // Fill candidates for toot
     if (
       jsonCache[item.url].lastTootTimestamp === undefined ||
-      (allowMultipleToots &&
+      (nbTootsPerItem > jsonCache[item.url].toots.length &&
         Date.now() <
           jsonCache[item.url].lastTootTimestamp +
-            minutesBetweenTootsForSameItem * 60 * 1000)
+            delayTootsSameItem * 60 * 1000)
     ) {
       itemsNotTootedRecently[item.url] = { ...jsonCache[item.url] };
     }
@@ -21769,7 +21763,7 @@ async function run() {
     const feedUrl = core.getInput("feedUrl", { required: true });
     // const mastodonInstance = core.getInput("mastodonInstance", { required: true });
     // const mastodonToken = core.getInput("mastodonToken", { required: true });
-    const minutesBetweenToots = core.getInput("minutesBetweenToots");
+    const globalDelayToots = core.getInput("globalDelayToots");
     const cacheTimestampFile = core.getInput("cacheTimestampFile");
 
     // Check if required parameters are set
@@ -21789,10 +21783,7 @@ async function run() {
     // Get values from existing caches
     const jsonTimestamp = require(cacheTimestampFile);
 
-    if (
-      Date.now() <
-      jsonTimestamp.timestamp + minutesBetweenToots * 60 * 1000
-    ) {
+    if (Date.now() < jsonTimestamp.timestamp + globalDelayToots * 60 * 1000) {
       core.info(`Too soon…`);
       return;
     }
