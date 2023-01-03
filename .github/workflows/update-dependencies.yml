@@ -57,11 +57,11 @@ jobs:
       #   if: ${{ steps.vars.outputs.outdated != '' }}
       #   run: npm test:unit
 
-      - name: Build 🏗️
-        if: ${{ steps.vars.outputs.outdated != '' }}
-        run: npm run build
-        env:
-          NODE_ENV: production
+      # - name: Build 🏗️
+      #   if: ${{ steps.vars.outputs.outdated != '' }}
+      #   run: npm run build
+      #   env:
+      #     NODE_ENV: production
 
       - name: Commit and create PR 🔀
         if: ${{ steps.vars.outputs.outdated != '' }}
