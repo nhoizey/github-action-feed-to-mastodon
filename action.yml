@@ -51,7 +51,7 @@ runs:
     - name: JSON Feed to Mastodon 🦣
       env:
         RUNNER_TEMPORARY_DIRECTORY: ${{ runner.temp }}
-      run: node ./dist/index.js >> $GITHUB_STEP_SUMMARY
+      run: node ./dist/index.js
       shell: bash
 
     - name: Pull any changes 📥
