@@ -8,4 +8,4 @@ jobs:
 
     steps:
       - name: JSON Feed to Mastodon
-        uses: nhoizey/github-action-jsonfeed-to-mastodon@v1.0.0-alpha.1
+        uses: nhoizey/github-action-jsonfeed-to-mastodon@v1
