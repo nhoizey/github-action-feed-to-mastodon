@@ -64,5 +64,3 @@ runs:
         commit_message: "chore(cache): update Mastodon cache file (automated)"
         file_pattern: "*.json"
         skip_fetch: false
-
-  main: "dist/index.js"
