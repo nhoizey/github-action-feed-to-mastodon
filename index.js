@@ -1,18 +1,50 @@
-const core = require('@actions/core');
-const wait = require('./wait');
+// Third party dependencies
+const core = require("@actions/core");
 
+// Local dependencies
+const processFeed = require("./lib/process-feed");
 
-// most @actions toolkit packages have async methods
 async function run() {
   try {
-    const ms = core.getInput('milliseconds');
-    core.info(`Waiting ${ms} milliseconds ...`);
+    // Get Action parameters
+    const feedUrl = core.getInput("feedUrl", { required: true });
+    // const mastodonInstance = core.getInput("mastodonInstance", { required: true });
+    // const mastodonToken = core.getInput("mastodonToken", { required: true });
+    const minutesBetweenToots = core.getInput("minutesBetweenToots");
+    const cacheTimestampFile = core.getInput("cacheTimestampFile");
 
-    core.debug((new Date()).toTimeString()); // debug is only output if you set the secret `ACTIONS_RUNNER_DEBUG` to true
-    await wait(parseInt(ms));
-    core.info((new Date()).toTimeString());
+    // Check if required parameters are set
+    // if (feedUrl === undefined || feedUrl === "") {
+    //   throw new Error("The 'feedUrl' parameter is required");
+    // }
+    // if (mastodonInstance === undefined || mastodonInstance === "") {
+    //   throw new Error("The 'mastodonInstance' parameter is required");
+    // }
+    // if (mastodonToken === undefined || mastodonToken === "") {
+    //   throw new Error("The 'mastodonToken' parameter is required");
+    // }
+    // if (githubToken === undefined || githubToken === "") {
+    //   throw new Error("The 'githubToken' parameter is required");
+    // }
 
-    core.setOutput('time', new Date().toTimeString());
+    // Get values from existing caches
+    const jsonTimestamp = require(cacheTimestampFile);
+
+    if (
+      Date.now() <
+      jsonTimestamp.timestamp + minutesBetweenToots * 60 * 1000
+    ) {
+      core.info(`Too soon…`);
+      return;
+    }
+
+    const tootUrl = await processFeed(feedUrl);
+    if (tootUrl) {
+      core.info(`Success! ${tootUrl}`);
+    } else {
+      core.info("No item to toot");
+    }
+    core.setOutput("tootUrl", tootUrl);
   } catch (error) {
     core.setFailed(error.message);
   }

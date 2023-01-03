@@ -1,6 +1,295 @@
 require('./sourcemap-register.js');/******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
+/***/ 434:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(186);
+
+// Native Node modules
+const path = __nccwpck_require__(49);
+const fs = __nccwpck_require__(747);
+const os = __nccwpck_require__(87);
+const crypto = __nccwpck_require__(417);
+
+// Third party dependencies
+const { login } = __nccwpck_require__(114);
+
+// Local dependencies
+const download = __nccwpck_require__(933);
+
+const createToot = async (tootData) => {
+  // Get Action parameters
+  const mastodonInstance = core.getInput("mastodonInstance", {
+    required: true,
+  });
+  const mastodonToken = core.getInput("mastodonToken", { required: true });
+
+  const TEMPORARY_DIRECTORY =
+    process.env.RUNNER_TEMPORARY_DIRECTORY || os.tmpdir();
+
+  // Helper Function to return unknown errors
+  const handleError = (error) => {
+    const code = Array.isArray(error) ? error[0].code : error.code;
+    const msg = Array.isArray(error) ? error[0].message : error.message;
+    process.exitCode = 1;
+    // TODO: no need to return?
+    return status(code, String(msg));
+  };
+
+  // Helper Function to return function status
+  const status = (code, msg) => {
+    core.info(`[${code}] ${msg}`);
+    // TODO: no need to return
+    return {
+      statusCode: code,
+      body: msg,
+    };
+  };
+
+  try {
+    // Connect to Mastodon
+    const MastodonClient = await login({
+      url: mastodonInstance,
+      accessToken: mastodonToken,
+    });
+
+    let toot = {
+      status: tootData.content_text,
+      visibility: "public",
+      language: tootData.lang,
+    };
+
+    // Check if there's at least one image attachment
+    if (
+      Object.prototype.hasOwnProperty.call(tootData, "attachments") &&
+      tootData.attachments.length > 0
+    ) {
+      let imagesAttachments = tootData.attachments.filter((attachment) =>
+        // Only keep images
+        attachment.mime_type.match("image/")
+      );
+      if (imagesAttachments.length > 0) {
+        let uploadedImages = await Promise.all(
+          imagesAttachments.map(async (attachment) => {
+            let imageFile = path.join(
+              TEMPORARY_DIRECTORY,
+              `image-${crypto.randomUUID()}`
+            );
+            try {
+              // Download the image file
+              await download(attachment.url, imageFile);
+            } catch (e) {
+              handleError(e.message);
+            }
+
+            let media;
+            try {
+              media = await MastodonClient.mediaAttachments.create({
+                file: fs.createReadStream(imageFile),
+                description: attachment.title,
+              });
+              // Remove the temporary local copy
+              await fs.unlink(imageFile, () => {
+                // console.log(`${imageFile} deleted.`);
+              });
+              return media.id;
+            } catch (error) {
+              handleError(error);
+            }
+          })
+        );
+
+        toot.mediaIds = uploadedImages;
+      }
+    }
+
+    const tootResult = await MastodonClient.statuses.create(toot);
+
+    return tootResult && tootResult.uri;
+  } catch (error) {
+    return handleError(error);
+  }
+};
+
+module.exports = createToot;
+
+
+/***/ }),
+
+/***/ 933:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+// From https://stackoverflow.com/a/66507546
+
+const fs = __nccwpck_require__(747);
+const https = __nccwpck_require__(211);
+const { basename } = __nccwpck_require__(622);
+const { URL } = __nccwpck_require__(414);
+
+const TIMEOUT = 10000;
+
+function download(url, dest) {
+  const uri = new URL(url);
+  if (!dest) {
+    dest = basename(uri.pathname);
+  }
+
+  return new Promise((resolve, reject) => {
+    const request = https.get(uri.href).on("response", (res) => {
+      if (res.statusCode === 200) {
+        const file = fs.createWriteStream(dest, { flags: "wx" });
+        res
+          .on("end", () => {
+            file.end();
+            resolve();
+          })
+          .on("error", (err) => {
+            file.destroy();
+            fs.unlink(dest, () => reject(err));
+          })
+          .pipe(file);
+      } else if (res.statusCode === 302 || res.statusCode === 301) {
+        // Recursively follow redirects, only a 200 will resolve.
+        download(res.headers.location, dest).then(() => resolve());
+      } else {
+        reject(
+          new Error(
+            `Download request failed, response status: ${res.statusCode} ${res.statusMessage}`
+          )
+        );
+      }
+    });
+    request.setTimeout(TIMEOUT, function () {
+      request.destroy();
+      reject(new Error(`Request timeout after ${TIMEOUT / 1000.0}s`));
+    });
+  });
+}
+
+module.exports = download;
+
+
+/***/ }),
+
+/***/ 248:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+// Native Node modules
+const fs = __nccwpck_require__(747);
+
+// Third party dependencies
+const core = __nccwpck_require__(186);
+
+// Local dependencies
+const createToot = __nccwpck_require__(434);
+
+const processFeed = async (feedUrl) => {
+  // Get Action parameters
+  const mastodonInstance = core.getInput("mastodonInstance", {
+    required: true,
+  });
+  const allowMultipleToots = core.getBooleanInput("allowMultipleToots");
+  const minutesBetweenTootsForSameItem = core.getInput(
+    "minutesBetweenTootsForSameItem"
+  );
+  const cacheFile = core.getInput("cacheFile");
+  const cacheTimestampFile = core.getInput("cacheTimestampFile");
+
+  // Get values from existing caches
+  const jsonCache = require(cacheFile);
+  const jsonTimestamp = require(cacheTimestampFile);
+
+  core.info(`Fetching ${feedUrl} …`);
+  const feedContent = await fetch(feedUrl).then((response) => response.json());
+
+  let items = feedContent.items;
+  const itemsNotTootedRecently = {};
+
+  // Iterate over feed items
+  items.forEach((item) => {
+    // Fill cache with new items
+    // TODO: remove items from cache that are not anymore in the feed
+    if (Object.prototype.hasOwnProperty.call(jsonCache, item.url)) {
+      const existingToots = [...jsonCache[item.url].toots];
+      let lastTootTimestamp = jsonCache[item.url].lastTootTimestamp;
+      // Initialize lastTootTimestamp for items already with some toots
+      if (lastTootTimestamp === undefined && existingToots.length > 0) {
+        lastTootTimestamp = Date.now();
+      }
+      // Update item content
+      jsonCache[item.url] = item;
+      // Restore existing toots
+      jsonCache[item.url].toots = existingToots;
+      jsonCache[item.url].lastTootTimestamp = lastTootTimestamp;
+    } else {
+      // This is a new item
+      jsonCache[item.url] = item;
+      jsonCache[item.url].toots = [];
+    }
+    // Fill candidates for toot
+    if (
+      jsonCache[item.url].lastTootTimestamp === undefined ||
+      (allowMultipleToots &&
+        Date.now() <
+          jsonCache[item.url].lastTootTimestamp +
+            minutesBetweenTootsForSameItem * 60 * 1000)
+    ) {
+      itemsNotTootedRecently[item.url] = { ...jsonCache[item.url] };
+    }
+  });
+
+  if (Object.keys(itemsNotTootedRecently).length === 0) {
+    return false;
+  }
+
+  // Get lowest number of toots for any item
+  let minTimes = -1;
+  const itemsPerTimes = {};
+  for (const itemUrl in itemsNotTootedRecently) {
+    const itemTimes = itemsNotTootedRecently[itemUrl].toots.length;
+    minTimes = minTimes === -1 ? itemTimes : Math.min(minTimes, itemTimes);
+    if (!Object.prototype.hasOwnProperty.call(itemsPerTimes, itemTimes)) {
+      itemsPerTimes[itemTimes] = [];
+    }
+    itemsPerTimes[itemTimes].push(itemsNotTootedRecently[itemUrl]);
+  }
+
+  // Keep only recent items that have been POSSEd the less
+  const candidates = itemsPerTimes[minTimes];
+
+  const itemToPosse = candidates[Math.floor(Math.random() * candidates.length)];
+
+  try {
+    core.info(`Attempting to create toot "${itemToPosse.title}"`);
+    const tootUrl = await createToot(itemToPosse);
+    // TODO: better test?
+    if (tootUrl && tootUrl.startsWith(mastodonInstance)) {
+      jsonCache[itemToPosse.url].toots.push(tootUrl);
+      jsonCache[itemToPosse.url].lastTootTimestamp = Date.now();
+      jsonTimestamp.timestamp = Date.now();
+
+      fs.writeFileSync(cacheFile, JSON.stringify(jsonCache, null, 2), {
+        encoding: "utf8",
+      });
+      fs.writeFileSync(
+        cacheTimestampFile,
+        JSON.stringify(jsonTimestamp, null, 2),
+        {
+          encoding: "utf8",
+        }
+      );
+    }
+  } catch (error) {
+    throw new Error(error);
+  }
+};
+
+module.exports = processFeed;
+
+
+/***/ }),
+
 /***/ 351:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -2688,19 +2977,10 @@ exports.default = _default;
 
 /***/ }),
 
-/***/ 258:
+/***/ 114:
 /***/ ((module) => {
 
-let wait = function (milliseconds) {
-  return new Promise((resolve) => {
-    if (typeof milliseconds !== 'number') {
-      throw new Error('milliseconds not a number');
-    }
-    setTimeout(() => resolve("done!"), milliseconds)
-  });
-};
-
-module.exports = wait;
+module.exports = eval("require")("masto");
 
 
 /***/ }),
@@ -2761,6 +3041,14 @@ module.exports = require("net");
 
 /***/ }),
 
+/***/ 49:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("node:path");
+
+/***/ }),
+
 /***/ 87:
 /***/ ((module) => {
 
@@ -2782,6 +3070,14 @@ module.exports = require("path");
 
 "use strict";
 module.exports = require("tls");
+
+/***/ }),
+
+/***/ 414:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("url");
 
 /***/ }),
 
@@ -2834,21 +3130,53 @@ module.exports = require("util");
 var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
 (() => {
+// Third party dependencies
 const core = __nccwpck_require__(186);
-const wait = __nccwpck_require__(258);
 
+// Local dependencies
+const processFeed = __nccwpck_require__(248);
 
-// most @actions toolkit packages have async methods
 async function run() {
   try {
-    const ms = core.getInput('milliseconds');
-    core.info(`Waiting ${ms} milliseconds ...`);
+    // Get Action parameters
+    const feedUrl = core.getInput("feedUrl", { required: true });
+    // const mastodonInstance = core.getInput("mastodonInstance", { required: true });
+    // const mastodonToken = core.getInput("mastodonToken", { required: true });
+    const minutesBetweenToots = core.getInput("minutesBetweenToots");
+    const cacheTimestampFile = core.getInput("cacheTimestampFile");
 
-    core.debug((new Date()).toTimeString()); // debug is only output if you set the secret `ACTIONS_RUNNER_DEBUG` to true
-    await wait(parseInt(ms));
-    core.info((new Date()).toTimeString());
+    // Check if required parameters are set
+    // if (feedUrl === undefined || feedUrl === "") {
+    //   throw new Error("The 'feedUrl' parameter is required");
+    // }
+    // if (mastodonInstance === undefined || mastodonInstance === "") {
+    //   throw new Error("The 'mastodonInstance' parameter is required");
+    // }
+    // if (mastodonToken === undefined || mastodonToken === "") {
+    //   throw new Error("The 'mastodonToken' parameter is required");
+    // }
+    // if (githubToken === undefined || githubToken === "") {
+    //   throw new Error("The 'githubToken' parameter is required");
+    // }
 
-    core.setOutput('time', new Date().toTimeString());
+    // Get values from existing caches
+    const jsonTimestamp = require(cacheTimestampFile);
+
+    if (
+      Date.now() <
+      jsonTimestamp.timestamp + minutesBetweenToots * 60 * 1000
+    ) {
+      core.info(`Too soon…`);
+      return;
+    }
+
+    const tootUrl = await processFeed(feedUrl);
+    if (tootUrl) {
+      core.info(`Success! ${tootUrl}`);
+    } else {
+      core.info("No item to toot");
+    }
+    core.setOutput("tootUrl", tootUrl);
   } catch (error) {
     core.setFailed(error.message);
   }

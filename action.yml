@@ -1,13 +1,34 @@
-name: 'Wait'
-description: 'Wait a designated number of milliseconds'
+name: "JSON Feed to Mastodon"
+description: "Create messages (toots) on Mastodon from a JSON Feed items"
+author: "Nicolas Hoizey"
 inputs:
-  milliseconds:  # id of input
-    description: 'number of milliseconds to wait'
+  feedUrl:
+    description: "URL of the JSON Feed to fetch"
     required: true
-    default: '1000'
+  mastodonInstance:
+    description: "The root URL of the Mastodon instance where the toot should be created"
+    required: true
+  mastodonToken:
+    description: "Your access token for the Mastodon API, get it from /settings/applications/new"
+    required: true
+  allowMultipleToots:
+    description: "Can the same item be tooted multiple times"
+    default: false
+  minutesBetweenToots:
+    description: "Delay (in minutes) between any toot from this feed (default: 1 day)"
+    default: 1440
+  minutesBetweenTootsForSameItem:
+    description: "Delay (in minutes) between any toot from this feed for the same item (default: 90 days)"
+    default: 129600
+  cacheFile:
+    description: "Path to the JSON file caching data from the feed and toots"
+    default: ".cache/jsonfeed-to-mastodon.json"
+  cacheTimestampFile:
+    description: "Path to the JSON file caching the timestamp of the last toot"
+    default: ".cache/jsonfeed-to-mastodon-timestamp.json"
 outputs:
-  time: # output will be available to future steps
-    description: 'The current time after waiting'
+  tootUrl: # output will be available to future steps
+    description: "URL to the latest toot created"
 runs:
-  using: 'node16'
-  main: 'dist/index.js'
+  using: "node16"
+  main: "dist/index.js"
