@@ -7,7 +7,8 @@
     "lint": "eslint .",
     "prepare": "ncc build index.js -o dist --source-map --license licenses.txt",
     "test": "jest",
-    "all": "npm run lint && npm run prepare && npm run test"
+    "all": "npm run lint && npm run prepare && npm run test",
+    "updateTag": "git tag -fa v1 -m \"Update v1 tag\" && git push origin v1 --force"
   },
   "repository": {
     "type": "git",
@@ -27,7 +28,6 @@
   "homepage": "https://github.com/nhoizey/github-action-jsonfeed-to-mastodon#readme",
   "devDependencies": {
     "@actions/core": "^1.10.0",
-    "@actions/github": "^5.1.1",
     "@vercel/ncc": "^0.31.1",
     "eslint": "^8.31.0",
     "jest": "^27.5.1",
