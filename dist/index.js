@@ -268,7 +268,6 @@ const processFeed = async (feedUrl) => {
       jsonCache[itemToPosse.url].lastTootTimestamp = Date.now();
 
       core.notice(`Currently in ${__dirname}`);
-      core.notice(`Cache directory: ${cacheDirectory}`);
       if (!fs.existsSync(cacheDirectory)) {
         core.notice(`Creating ${cacheDirectory}`);
         fs.mkdirSync(cacheDirectory, { recursive: true });
