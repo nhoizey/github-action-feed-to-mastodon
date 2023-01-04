@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "lint": "eslint .",
-    "prepare": "ncc build index.js -o dist --source-map --license licenses.txt",
+    "build": "ncc build index.js -o dist --source-map --license licenses.txt",
     "test": "jest",
-    "all": "npm run lint && npm run prepare && npm run test",
+    "all": "npm run lint && npm run build && npm run test",
     "updateTag": "git tag -fa v1 -m \"Update v1 tag\" && git push origin v1 --force"
   },
   "repository": {
