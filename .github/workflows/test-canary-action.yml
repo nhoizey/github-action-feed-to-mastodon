@@ -24,7 +24,7 @@ jobs:
         env:
           RUNNER_TEMPORARY_DIRECTORY: ${{ runner.temp }}
         with:
-          feedUrl: "https://nicolas-hoizey.photo/feeds/mastodon/photos.json"
+          feedUrl: "https://nicolas-hoizey.photo/feeds/mastodon/photos-test.json"
           mastodonInstance: ${{ secrets.TEST_MASTODON_INSTANCE }}
           mastodonToken: ${{ secrets.TEST_MASTODON_TOKEN }}
 
