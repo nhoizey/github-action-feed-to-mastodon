@@ -4,8 +4,6 @@ require('./sourcemap-register.js');/******/ (() => { // webpackBootstrap
 /***/ 7434:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-const core = __nccwpck_require__(2186);
-
 // Native Node modules
 const path = __nccwpck_require__(2049);
 const fs = __nccwpck_require__(5747);
@@ -13,6 +11,7 @@ const os = __nccwpck_require__(2087);
 const crypto = __nccwpck_require__(6417);
 
 // Third party dependencies
+const { notice, getInput } = __nccwpck_require__(2186);
 const { login } = __nccwpck_require__(880);
 
 // Local dependencies
@@ -20,10 +19,10 @@ const download = __nccwpck_require__(5933);
 
 const createToot = async (tootData) => {
   // Get Action parameters
-  const mastodonInstance = core.getInput("mastodonInstance", {
+  const mastodonInstance = getInput("mastodonInstance", {
     required: true,
   });
-  const mastodonToken = core.getInput("mastodonToken", { required: true });
+  const mastodonToken = getInput("mastodonToken", { required: true });
 
   const TEMPORARY_DIRECTORY =
     process.env.RUNNER_TEMPORARY_DIRECTORY || os.tmpdir();
@@ -39,7 +38,7 @@ const createToot = async (tootData) => {
 
   // Helper Function to return function status
   const status = (code, msg) => {
-    core.notice(`[${code}] ${msg}`);
+    notice(`[${code}] ${msg}`);
     // TODO: no need to return
     return {
       statusCode: code,
@@ -180,8 +179,8 @@ const fs = __nccwpck_require__(5747);
 const path = __nccwpck_require__(2049);
 
 // Third party dependencies
-const core = __nccwpck_require__(2186);
-const github = __nccwpck_require__(5438);
+const { getInput, notice } = __nccwpck_require__(2186);
+const { context } = __nccwpck_require__(5438);
 const fetch = __nccwpck_require__(467);
 
 // Local dependencies
@@ -189,14 +188,14 @@ const createToot = __nccwpck_require__(7434);
 
 const processFeed = async (feedUrl) => {
   // Get Action parameters
-  const mastodonInstance = core.getInput("mastodonInstance", {
+  const mastodonInstance = getInput("mastodonInstance", {
     required: true,
   });
-  const nbTootsPerItem = core.getInput("nbTootsPerItem");
-  const delayTootsSameItem = core.getInput("delayTootsSameItem");
-  const cacheDirectory = core.getInput("cacheDirectory");
-  const cacheFile = core.getInput("cacheFile");
-  const cacheTimestampFile = core.getInput("cacheTimestampFile");
+  const nbTootsPerItem = getInput("nbTootsPerItem");
+  const delayTootsSameItem = getInput("delayTootsSameItem");
+  const cacheDirectory = getInput("cacheDirectory");
+  const cacheFile = getInput("cacheFile");
+  const cacheTimestampFile = getInput("cacheTimestampFile");
 
   // Get values from existing cache
   let jsonCache = {};
@@ -204,7 +203,7 @@ const processFeed = async (feedUrl) => {
     jsonCache = require(path.join(cacheDirectory, cacheFile));
   }
 
-  core.notice(`Fetching ${feedUrl} …`);
+  notice(`Fetching ${feedUrl} …`);
   const feedContent = await fetch(feedUrl).then((response) => response.json());
 
   let items = feedContent.items;
@@ -261,18 +260,17 @@ const processFeed = async (feedUrl) => {
   const itemToPosse = candidates[Math.floor(Math.random() * candidates.length)];
 
   try {
-    core.notice(`Attempting to create toot for item "${itemToPosse.title}"`);
+    notice(`Attempting to create toot for item "${itemToPosse.title}"`);
     const tootUrl = await createToot(itemToPosse);
     // TODO: better test?
     if (tootUrl && tootUrl.startsWith(mastodonInstance)) {
       jsonCache[itemToPosse.url].toots.push(tootUrl);
       jsonCache[itemToPosse.url].lastTootTimestamp = Date.now();
 
-      const { context = {} } = github;
-      core.notice(JSON.stringify(context.payload.repository, null, 2));
-      core.notice(`Currently in ${__dirname}`);
+      notice(JSON.stringify(context.payload.repository, null, 2));
+      notice(`Currently in ${__dirname}`);
       if (!fs.existsSync(cacheDirectory)) {
-        core.notice(`Creating ${cacheDirectory}`);
+        notice(`Creating ${cacheDirectory}`);
         fs.mkdirSync(cacheDirectory, { recursive: true });
       }
       fs.writeFileSync(
@@ -29887,7 +29885,13 @@ var __webpack_exports__ = {};
 const fs = __nccwpck_require__(5747);
 
 // Third party dependencies
-const core = __nccwpck_require__(2186);
+const {
+  getInput,
+  notice,
+  warning,
+  setOutput,
+  setFailed,
+} = __nccwpck_require__(2186);
 
 // Local dependencies
 const processFeed = __nccwpck_require__(7248);
@@ -29895,9 +29899,9 @@ const processFeed = __nccwpck_require__(7248);
 async function run() {
   try {
     // Get Action parameters
-    const feedUrl = core.getInput("feedUrl", { required: true });
-    const globalDelayToots = core.getInput("globalDelayToots");
-    const cacheTimestampFile = core.getInput("cacheTimestampFile");
+    const feedUrl = getInput("feedUrl", { required: true });
+    const globalDelayToots = getInput("globalDelayToots");
+    const cacheTimestampFile = getInput("cacheTimestampFile");
 
     // Get values from existing caches
     let jsonTimestamp = { timestamp: 0 };
@@ -29905,20 +29909,21 @@ async function run() {
       jsonTimestamp = require(cacheTimestampFile);
     }
 
+    notice(`Previous attemps: ${jsonTimestamp.timestamp}`);
     if (Date.now() < jsonTimestamp.timestamp + globalDelayToots * 60 * 1000) {
-      core.warning(`Too soon…`);
+      warning(`Too soon…`);
       return;
     }
 
     const tootUrl = await processFeed(feedUrl);
     if (tootUrl) {
-      core.notice(`Success! ${tootUrl}`);
+      notice(`Success! ${tootUrl}`);
     } else {
-      core.notice("No item to toot");
+      notice("No item to toot");
     }
-    core.setOutput("tootUrl", tootUrl);
+    setOutput("tootUrl", tootUrl);
   } catch (error) {
-    core.setFailed(error.message);
+    setFailed(error.message);
   }
 }
 

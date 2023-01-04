@@ -2,7 +2,13 @@
 const fs = require("fs");
 
 // Third party dependencies
-const core = require("@actions/core");
+const {
+  getInput,
+  notice,
+  warning,
+  setOutput,
+  setFailed,
+} = require("@actions/core");
 
 // Local dependencies
 const processFeed = require("./lib/process-feed");
@@ -10,9 +16,9 @@ const processFeed = require("./lib/process-feed");
 async function run() {
   try {
     // Get Action parameters
-    const feedUrl = core.getInput("feedUrl", { required: true });
-    const globalDelayToots = core.getInput("globalDelayToots");
-    const cacheTimestampFile = core.getInput("cacheTimestampFile");
+    const feedUrl = getInput("feedUrl", { required: true });
+    const globalDelayToots = getInput("globalDelayToots");
+    const cacheTimestampFile = getInput("cacheTimestampFile");
 
     // Get values from existing caches
     let jsonTimestamp = { timestamp: 0 };
@@ -20,20 +26,21 @@ async function run() {
       jsonTimestamp = require(cacheTimestampFile);
     }
 
+    notice(`Previous attemps: ${jsonTimestamp.timestamp}`);
     if (Date.now() < jsonTimestamp.timestamp + globalDelayToots * 60 * 1000) {
-      core.warning(`Too soon…`);
+      warning(`Too soon…`);
       return;
     }
 
     const tootUrl = await processFeed(feedUrl);
     if (tootUrl) {
-      core.notice(`Success! ${tootUrl}`);
+      notice(`Success! ${tootUrl}`);
     } else {
-      core.notice("No item to toot");
+      notice("No item to toot");
     }
-    core.setOutput("tootUrl", tootUrl);
+    setOutput("tootUrl", tootUrl);
   } catch (error) {
-    core.setFailed(error.message);
+    setFailed(error.message);
   }
 }
 
