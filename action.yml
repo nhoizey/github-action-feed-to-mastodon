@@ -53,6 +53,15 @@ runs:
         RUNNER_TEMPORARY_DIRECTORY: ${{ runner.temp }}
       run: node ./dist/index.js
       shell: bash
+      with:
+        feedUrl: ${{ inputs.feedUrl }}
+        mastodonInstance: ${{ inputs.mastodonInstance }}
+        mastodonToken: ${{ inputs.mastodonToken }}
+        nbTootsPerItem: ${{ inputs.nbTootsPerItem }}
+        globalDelayToots: ${{ inputs.globalDelayToots }}
+        delayTootsSameItem: ${{ inputs.delayTootsSameItem }}
+        cacheFile: ${{ inputs.cacheFile }}
+        cacheTimestampFile: ${{ inputs.cacheTimestampFile }}
 
     - name: Pull any changes 📥
       run: git pull
