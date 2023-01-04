@@ -4,6 +4,7 @@ const { existsSync } = require("fs");
 // Third party dependencies
 const {
   getInput,
+  info,
   notice,
   warning,
   setOutput,
@@ -24,7 +25,7 @@ async function run() {
     let jsonTimestamp = { timestamp: 0 };
     if (existsSync(cacheTimestampFile)) {
       jsonTimestamp = require(cacheTimestampFile);
-      notice(`Previous attempt: ${jsonTimestamp.timestamp}`);
+      info(`Previous attempt: ${jsonTimestamp.timestamp}`);
     } else {
       warning("No cache found.");
     }
@@ -38,7 +39,7 @@ async function run() {
     if (tootUrl) {
       notice(`Success! ${tootUrl}`);
     } else {
-      notice("No item to toot");
+      warning("No item to toot");
     }
     setOutput("tootUrl", tootUrl);
   } catch (error) {

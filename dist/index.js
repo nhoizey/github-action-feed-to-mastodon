@@ -179,8 +179,7 @@ const { existsSync, writeFileSync } = __nccwpck_require__(5747);
 const path = __nccwpck_require__(2049);
 
 // Third party dependencies
-const { getInput, notice } = __nccwpck_require__(2186);
-// const { context } = require("@actions/github");
+const { getInput, info } = __nccwpck_require__(2186);
 const { mkdirP } = __nccwpck_require__(7436);
 const fetch = __nccwpck_require__(467);
 
@@ -204,7 +203,7 @@ const processFeed = async (feedUrl) => {
     jsonCache = require(path.join(cacheDirectory, cacheFile));
   }
 
-  notice(`Fetching ${feedUrl} …`);
+  info(`Fetching ${feedUrl} …`);
   const feedContent = await fetch(feedUrl).then((response) => response.json());
 
   let items = feedContent.items;
@@ -261,18 +260,18 @@ const processFeed = async (feedUrl) => {
   const itemToPosse = candidates[Math.floor(Math.random() * candidates.length)];
 
   try {
-    notice(`Attempting to create toot for item "${itemToPosse.title}"`);
+    info(`Creating toot for item "${itemToPosse.title}"`);
     const tootUrl = await createToot(itemToPosse);
     // TODO: better test?
     if (tootUrl && tootUrl.startsWith(mastodonInstance)) {
       jsonCache[itemToPosse.url].toots.push(tootUrl);
       jsonCache[itemToPosse.url].lastTootTimestamp = Date.now();
 
-      // const cacheDirectoryFullPath = path.join(process.cwd(), cacheDirectory);
       if (!existsSync(cacheDirectory)) {
-        notice(`Creating ${cacheDirectory}`);
+        info(`Creating cache directory "${cacheDirectory}"`);
         await mkdirP(cacheDirectory, { recursive: true });
       }
+      info("Saving cache files");
       writeFileSync(
         path.join(cacheDirectory, cacheFile),
         JSON.stringify(jsonCache, null, 2),
@@ -27475,6 +27474,7 @@ const { existsSync } = __nccwpck_require__(5747);
 // Third party dependencies
 const {
   getInput,
+  info,
   notice,
   warning,
   setOutput,
@@ -27495,7 +27495,7 @@ async function run() {
     let jsonTimestamp = { timestamp: 0 };
     if (existsSync(cacheTimestampFile)) {
       jsonTimestamp = require(cacheTimestampFile);
-      notice(`Previous attempt: ${jsonTimestamp.timestamp}`);
+      info(`Previous attempt: ${jsonTimestamp.timestamp}`);
     } else {
       warning("No cache found.");
     }
@@ -27509,7 +27509,7 @@ async function run() {
     if (tootUrl) {
       notice(`Success! ${tootUrl}`);
     } else {
-      notice("No item to toot");
+      warning("No item to toot");
     }
     setOutput("tootUrl", tootUrl);
   } catch (error) {
