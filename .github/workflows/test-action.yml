@@ -10,4 +10,4 @@ jobs:
       - name: JSON Feed to Mastodon
         uses: nhoizey/github-action-jsonfeed-to-mastodon@v1
         with:
-          feedUrl: https://nicolas-hoizey.photo/feeds/mastodon/photos.json
+          feedUrl: "https://nicolas-hoizey.photo/feeds/mastodon/photos.json"
