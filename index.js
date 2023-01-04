@@ -11,24 +11,8 @@ async function run() {
   try {
     // Get Action parameters
     const feedUrl = core.getInput("feedUrl", { required: true });
-    // const mastodonInstance = core.getInput("mastodonInstance", { required: true });
-    // const mastodonToken = core.getInput("mastodonToken", { required: true });
     const globalDelayToots = core.getInput("globalDelayToots");
     const cacheTimestampFile = core.getInput("cacheTimestampFile");
-
-    // Check if required parameters are set
-    // if (feedUrl === undefined || feedUrl === "") {
-    //   throw new Error("The 'feedUrl' parameter is required");
-    // }
-    // if (mastodonInstance === undefined || mastodonInstance === "") {
-    //   throw new Error("The 'mastodonInstance' parameter is required");
-    // }
-    // if (mastodonToken === undefined || mastodonToken === "") {
-    //   throw new Error("The 'mastodonToken' parameter is required");
-    // }
-    // if (githubToken === undefined || githubToken === "") {
-    //   throw new Error("The 'githubToken' parameter is required");
-    // }
 
     // Get values from existing caches
     let jsonTimestamp = { timestamp: 0 };
