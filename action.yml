@@ -23,7 +23,8 @@ inputs:
   delayTootsSameItem:
     description: "Delay (in minutes) between any toot from this feed for the same item (default: 90 days)"
     default: 129600
-  cacheDirectory: "Path to the directory where cache files are stored"
+  cacheDirectory:
+    description: "Path to the directory where cache files are stored"
     default: ".cache"
   cacheFile:
     description: "Name of the JSON file caching data from the feed and toots"
