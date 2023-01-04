@@ -181,6 +181,7 @@ const path = __nccwpck_require__(2049);
 
 // Third party dependencies
 const core = __nccwpck_require__(2186);
+const github = __nccwpck_require__(716);
 const fetch = __nccwpck_require__(467);
 
 // Local dependencies
@@ -267,6 +268,8 @@ const processFeed = async (feedUrl) => {
       jsonCache[itemToPosse.url].toots.push(tootUrl);
       jsonCache[itemToPosse.url].lastTootTimestamp = Date.now();
 
+      const { context = {} } = github;
+      core.notice(JSON.stringify(context, null, 2));
       core.notice(`Currently in ${__dirname}`);
       if (!fs.existsSync(cacheDirectory)) {
         core.notice(`Creating ${cacheDirectory}`);
@@ -22935,6 +22938,14 @@ function socketOnError() {
     this.destroy();
   }
 }
+
+
+/***/ }),
+
+/***/ 716:
+/***/ ((module) => {
+
+module.exports = eval("require")("@actions/github");
 
 
 /***/ }),
