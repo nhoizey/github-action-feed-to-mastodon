@@ -21,8 +21,9 @@ jobs:
 
       - name: JSON Feed to Mastodon
         uses: nhoizey/github-action-jsonfeed-to-mastodon@canary
-        with:
+        env:
           RUNNER_TEMPORARY_DIRECTORY: ${{ runner.temp }}
+        with:
           feedUrl: "https://nicolas-hoizey.photo/feeds/mastodon/photos.json"
 
       - name: Pull any changes 📥
