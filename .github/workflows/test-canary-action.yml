@@ -1,4 +1,4 @@
-name: Test action "JSON Feed to Mastodon"
+name: Test canary action
 on:
   workflow_dispatch:
 

@@ -32,8 +32,6 @@ inputs:
 outputs:
   tootUrl: # output will be available to future steps
     description: "URL to the latest toot created"
-env:
-  RUNNER_TEMPORARY_DIRECTORY: ${{ runner.temp }}
 runs:
   using: "node16"
   main: "dist/index.js"
