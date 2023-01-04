@@ -13,7 +13,7 @@ const os = __nccwpck_require__(2087);
 const crypto = __nccwpck_require__(6417);
 
 // Third party dependencies
-const { login } = __nccwpck_require__(3703);
+const { login } = __nccwpck_require__(880);
 
 // Local dependencies
 const download = __nccwpck_require__(5933);
@@ -2047,7 +2047,448 @@ exports.checkBypass = checkBypass;
 
 /***/ }),
 
-/***/ 7034:
+/***/ 4812:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+module.exports =
+{
+  parallel      : __nccwpck_require__(8210),
+  serial        : __nccwpck_require__(445),
+  serialOrdered : __nccwpck_require__(3578)
+};
+
+
+/***/ }),
+
+/***/ 1700:
+/***/ ((module) => {
+
+// API
+module.exports = abort;
+
+/**
+ * Aborts leftover active jobs
+ *
+ * @param {object} state - current state object
+ */
+function abort(state)
+{
+  Object.keys(state.jobs).forEach(clean.bind(state));
+
+  // reset leftover jobs
+  state.jobs = {};
+}
+
+/**
+ * Cleans up leftover job by invoking abort function for the provided job id
+ *
+ * @this  state
+ * @param {string|number} key - job id to abort
+ */
+function clean(key)
+{
+  if (typeof this.jobs[key] == 'function')
+  {
+    this.jobs[key]();
+  }
+}
+
+
+/***/ }),
+
+/***/ 2794:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var defer = __nccwpck_require__(5295);
+
+// API
+module.exports = async;
+
+/**
+ * Runs provided callback asynchronously
+ * even if callback itself is not
+ *
+ * @param   {function} callback - callback to invoke
+ * @returns {function} - augmented callback
+ */
+function async(callback)
+{
+  var isAsync = false;
+
+  // check if async happened
+  defer(function() { isAsync = true; });
+
+  return function async_callback(err, result)
+  {
+    if (isAsync)
+    {
+      callback(err, result);
+    }
+    else
+    {
+      defer(function nextTick_callback()
+      {
+        callback(err, result);
+      });
+    }
+  };
+}
+
+
+/***/ }),
+
+/***/ 5295:
+/***/ ((module) => {
+
+module.exports = defer;
+
+/**
+ * Runs provided function on next iteration of the event loop
+ *
+ * @param {function} fn - function to run
+ */
+function defer(fn)
+{
+  var nextTick = typeof setImmediate == 'function'
+    ? setImmediate
+    : (
+      typeof process == 'object' && typeof process.nextTick == 'function'
+      ? process.nextTick
+      : null
+    );
+
+  if (nextTick)
+  {
+    nextTick(fn);
+  }
+  else
+  {
+    setTimeout(fn, 0);
+  }
+}
+
+
+/***/ }),
+
+/***/ 9023:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var async = __nccwpck_require__(2794)
+  , abort = __nccwpck_require__(1700)
+  ;
+
+// API
+module.exports = iterate;
+
+/**
+ * Iterates over each job object
+ *
+ * @param {array|object} list - array or object (named list) to iterate over
+ * @param {function} iterator - iterator to run
+ * @param {object} state - current job status
+ * @param {function} callback - invoked when all elements processed
+ */
+function iterate(list, iterator, state, callback)
+{
+  // store current index
+  var key = state['keyedList'] ? state['keyedList'][state.index] : state.index;
+
+  state.jobs[key] = runJob(iterator, key, list[key], function(error, output)
+  {
+    // don't repeat yourself
+    // skip secondary callbacks
+    if (!(key in state.jobs))
+    {
+      return;
+    }
+
+    // clean up jobs
+    delete state.jobs[key];
+
+    if (error)
+    {
+      // don't process rest of the results
+      // stop still active jobs
+      // and reset the list
+      abort(state);
+    }
+    else
+    {
+      state.results[key] = output;
+    }
+
+    // return salvaged results
+    callback(error, state.results);
+  });
+}
+
+/**
+ * Runs iterator over provided job element
+ *
+ * @param   {function} iterator - iterator to invoke
+ * @param   {string|number} key - key/index of the element in the list of jobs
+ * @param   {mixed} item - job description
+ * @param   {function} callback - invoked after iterator is done with the job
+ * @returns {function|mixed} - job abort function or something else
+ */
+function runJob(iterator, key, item, callback)
+{
+  var aborter;
+
+  // allow shortcut if iterator expects only two arguments
+  if (iterator.length == 2)
+  {
+    aborter = iterator(item, async(callback));
+  }
+  // otherwise go with full three arguments
+  else
+  {
+    aborter = iterator(item, key, async(callback));
+  }
+
+  return aborter;
+}
+
+
+/***/ }),
+
+/***/ 2474:
+/***/ ((module) => {
+
+// API
+module.exports = state;
+
+/**
+ * Creates initial state object
+ * for iteration over list
+ *
+ * @param   {array|object} list - list to iterate over
+ * @param   {function|null} sortMethod - function to use for keys sort,
+ *                                     or `null` to keep them as is
+ * @returns {object} - initial state object
+ */
+function state(list, sortMethod)
+{
+  var isNamedList = !Array.isArray(list)
+    , initState =
+    {
+      index    : 0,
+      keyedList: isNamedList || sortMethod ? Object.keys(list) : null,
+      jobs     : {},
+      results  : isNamedList ? {} : [],
+      size     : isNamedList ? Object.keys(list).length : list.length
+    }
+    ;
+
+  if (sortMethod)
+  {
+    // sort array keys based on it's values
+    // sort object's keys just on own merit
+    initState.keyedList.sort(isNamedList ? sortMethod : function(a, b)
+    {
+      return sortMethod(list[a], list[b]);
+    });
+  }
+
+  return initState;
+}
+
+
+/***/ }),
+
+/***/ 7942:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var abort = __nccwpck_require__(1700)
+  , async = __nccwpck_require__(2794)
+  ;
+
+// API
+module.exports = terminator;
+
+/**
+ * Terminates jobs in the attached state context
+ *
+ * @this  AsyncKitState#
+ * @param {function} callback - final callback to invoke after termination
+ */
+function terminator(callback)
+{
+  if (!Object.keys(this.jobs).length)
+  {
+    return;
+  }
+
+  // fast forward iteration index
+  this.index = this.size;
+
+  // abort jobs
+  abort(this);
+
+  // send back results we have so far
+  async(callback)(null, this.results);
+}
+
+
+/***/ }),
+
+/***/ 8210:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var iterate    = __nccwpck_require__(9023)
+  , initState  = __nccwpck_require__(2474)
+  , terminator = __nccwpck_require__(7942)
+  ;
+
+// Public API
+module.exports = parallel;
+
+/**
+ * Runs iterator over provided array elements in parallel
+ *
+ * @param   {array|object} list - array or object (named list) to iterate over
+ * @param   {function} iterator - iterator to run
+ * @param   {function} callback - invoked when all elements processed
+ * @returns {function} - jobs terminator
+ */
+function parallel(list, iterator, callback)
+{
+  var state = initState(list);
+
+  while (state.index < (state['keyedList'] || list).length)
+  {
+    iterate(list, iterator, state, function(error, result)
+    {
+      if (error)
+      {
+        callback(error, result);
+        return;
+      }
+
+      // looks like it's the last one
+      if (Object.keys(state.jobs).length === 0)
+      {
+        callback(null, state.results);
+        return;
+      }
+    });
+
+    state.index++;
+  }
+
+  return terminator.bind(state, callback);
+}
+
+
+/***/ }),
+
+/***/ 445:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var serialOrdered = __nccwpck_require__(3578);
+
+// Public API
+module.exports = serial;
+
+/**
+ * Runs iterator over provided array elements in series
+ *
+ * @param   {array|object} list - array or object (named list) to iterate over
+ * @param   {function} iterator - iterator to run
+ * @param   {function} callback - invoked when all elements processed
+ * @returns {function} - jobs terminator
+ */
+function serial(list, iterator, callback)
+{
+  return serialOrdered(list, iterator, null, callback);
+}
+
+
+/***/ }),
+
+/***/ 3578:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var iterate    = __nccwpck_require__(9023)
+  , initState  = __nccwpck_require__(2474)
+  , terminator = __nccwpck_require__(7942)
+  ;
+
+// Public API
+module.exports = serialOrdered;
+// sorting helpers
+module.exports.ascending  = ascending;
+module.exports.descending = descending;
+
+/**
+ * Runs iterator over provided sorted array elements in series
+ *
+ * @param   {array|object} list - array or object (named list) to iterate over
+ * @param   {function} iterator - iterator to run
+ * @param   {function} sortMethod - custom sort function
+ * @param   {function} callback - invoked when all elements processed
+ * @returns {function} - jobs terminator
+ */
+function serialOrdered(list, iterator, sortMethod, callback)
+{
+  var state = initState(list, sortMethod);
+
+  iterate(list, iterator, state, function iteratorHandler(error, result)
+  {
+    if (error)
+    {
+      callback(error, result);
+      return;
+    }
+
+    state.index++;
+
+    // are we there yet?
+    if (state.index < (state['keyedList'] || list).length)
+    {
+      iterate(list, iterator, state, iteratorHandler);
+      return;
+    }
+
+    // done here
+    callback(null, state.results);
+  });
+
+  return terminator.bind(state, callback);
+}
+
+/*
+ * -- Sort methods
+ */
+
+/**
+ * sort helper to sort array elements in ascending order
+ *
+ * @param   {mixed} a - an item to compare
+ * @param   {mixed} b - an item to compare
+ * @returns {number} - comparison result
+ */
+function ascending(a, b)
+{
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * sort helper to sort array elements in descending order
+ *
+ * @param   {mixed} a - an item to compare
+ * @param   {mixed} b - an item to compare
+ * @returns {number} - comparison result
+ */
+function descending(a, b)
+{
+  return -1 * ascending(a, b);
+}
+
+
+/***/ }),
+
+/***/ 1403:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 var CombinedStream = __nccwpck_require__(5443);
@@ -2060,7 +2501,7 @@ var fs = __nccwpck_require__(5747);
 var Stream = __nccwpck_require__(2413).Stream;
 var mime = __nccwpck_require__(3583);
 var asynckit = __nccwpck_require__(4812);
-var populate = __nccwpck_require__(7516);
+var populate = __nccwpck_require__(7027);
 
 // Public API
 module.exports = FormData;
@@ -2555,7 +2996,7 @@ FormData.prototype.toString = function () {
 
 /***/ }),
 
-/***/ 7516:
+/***/ 7027:
 /***/ ((module) => {
 
 // populates missing values
@@ -2568,582 +3009,6 @@ module.exports = function(dst, src) {
 
   return dst;
 };
-
-
-/***/ }),
-
-/***/ 1659:
-/***/ ((module, exports, __nccwpck_require__) => {
-
-"use strict";
-/**
- * @author Toru Nagashima <https://github.com/mysticatea>
- * See LICENSE file in root directory for full license.
- */
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-
-var eventTargetShim = __nccwpck_require__(4697);
-
-/**
- * The signal class.
- * @see https://dom.spec.whatwg.org/#abortsignal
- */
-class AbortSignal extends eventTargetShim.EventTarget {
-    /**
-     * AbortSignal cannot be constructed directly.
-     */
-    constructor() {
-        super();
-        throw new TypeError("AbortSignal cannot be constructed directly");
-    }
-    /**
-     * Returns `true` if this `AbortSignal`'s `AbortController` has signaled to abort, and `false` otherwise.
-     */
-    get aborted() {
-        const aborted = abortedFlags.get(this);
-        if (typeof aborted !== "boolean") {
-            throw new TypeError(`Expected 'this' to be an 'AbortSignal' object, but got ${this === null ? "null" : typeof this}`);
-        }
-        return aborted;
-    }
-}
-eventTargetShim.defineEventAttribute(AbortSignal.prototype, "abort");
-/**
- * Create an AbortSignal object.
- */
-function createAbortSignal() {
-    const signal = Object.create(AbortSignal.prototype);
-    eventTargetShim.EventTarget.call(signal);
-    abortedFlags.set(signal, false);
-    return signal;
-}
-/**
- * Abort a given signal.
- */
-function abortSignal(signal) {
-    if (abortedFlags.get(signal) !== false) {
-        return;
-    }
-    abortedFlags.set(signal, true);
-    signal.dispatchEvent({ type: "abort" });
-}
-/**
- * Aborted flag for each instances.
- */
-const abortedFlags = new WeakMap();
-// Properties should be enumerable.
-Object.defineProperties(AbortSignal.prototype, {
-    aborted: { enumerable: true },
-});
-// `toString()` should return `"[object AbortSignal]"`
-if (typeof Symbol === "function" && typeof Symbol.toStringTag === "symbol") {
-    Object.defineProperty(AbortSignal.prototype, Symbol.toStringTag, {
-        configurable: true,
-        value: "AbortSignal",
-    });
-}
-
-/**
- * The AbortController.
- * @see https://dom.spec.whatwg.org/#abortcontroller
- */
-class AbortController {
-    /**
-     * Initialize this controller.
-     */
-    constructor() {
-        signals.set(this, createAbortSignal());
-    }
-    /**
-     * Returns the `AbortSignal` object associated with this object.
-     */
-    get signal() {
-        return getSignal(this);
-    }
-    /**
-     * Abort and signal to any observers that the associated activity is to be aborted.
-     */
-    abort() {
-        abortSignal(getSignal(this));
-    }
-}
-/**
- * Associated signals.
- */
-const signals = new WeakMap();
-/**
- * Get the associated signal of a given controller.
- */
-function getSignal(controller) {
-    const signal = signals.get(controller);
-    if (signal == null) {
-        throw new TypeError(`Expected 'this' to be an 'AbortController' object, but got ${controller === null ? "null" : typeof controller}`);
-    }
-    return signal;
-}
-// Properties should be enumerable.
-Object.defineProperties(AbortController.prototype, {
-    signal: { enumerable: true },
-    abort: { enumerable: true },
-});
-if (typeof Symbol === "function" && typeof Symbol.toStringTag === "symbol") {
-    Object.defineProperty(AbortController.prototype, Symbol.toStringTag, {
-        configurable: true,
-        value: "AbortController",
-    });
-}
-
-exports.AbortController = AbortController;
-exports.AbortSignal = AbortSignal;
-exports.default = AbortController;
-
-module.exports = AbortController
-module.exports.AbortController = module.exports.default = AbortController
-module.exports.AbortSignal = AbortSignal
-//# sourceMappingURL=abort-controller.js.map
-
-
-/***/ }),
-
-/***/ 4812:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-module.exports =
-{
-  parallel      : __nccwpck_require__(8210),
-  serial        : __nccwpck_require__(445),
-  serialOrdered : __nccwpck_require__(3578)
-};
-
-
-/***/ }),
-
-/***/ 1700:
-/***/ ((module) => {
-
-// API
-module.exports = abort;
-
-/**
- * Aborts leftover active jobs
- *
- * @param {object} state - current state object
- */
-function abort(state)
-{
-  Object.keys(state.jobs).forEach(clean.bind(state));
-
-  // reset leftover jobs
-  state.jobs = {};
-}
-
-/**
- * Cleans up leftover job by invoking abort function for the provided job id
- *
- * @this  state
- * @param {string|number} key - job id to abort
- */
-function clean(key)
-{
-  if (typeof this.jobs[key] == 'function')
-  {
-    this.jobs[key]();
-  }
-}
-
-
-/***/ }),
-
-/***/ 2794:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-var defer = __nccwpck_require__(5295);
-
-// API
-module.exports = async;
-
-/**
- * Runs provided callback asynchronously
- * even if callback itself is not
- *
- * @param   {function} callback - callback to invoke
- * @returns {function} - augmented callback
- */
-function async(callback)
-{
-  var isAsync = false;
-
-  // check if async happened
-  defer(function() { isAsync = true; });
-
-  return function async_callback(err, result)
-  {
-    if (isAsync)
-    {
-      callback(err, result);
-    }
-    else
-    {
-      defer(function nextTick_callback()
-      {
-        callback(err, result);
-      });
-    }
-  };
-}
-
-
-/***/ }),
-
-/***/ 5295:
-/***/ ((module) => {
-
-module.exports = defer;
-
-/**
- * Runs provided function on next iteration of the event loop
- *
- * @param {function} fn - function to run
- */
-function defer(fn)
-{
-  var nextTick = typeof setImmediate == 'function'
-    ? setImmediate
-    : (
-      typeof process == 'object' && typeof process.nextTick == 'function'
-      ? process.nextTick
-      : null
-    );
-
-  if (nextTick)
-  {
-    nextTick(fn);
-  }
-  else
-  {
-    setTimeout(fn, 0);
-  }
-}
-
-
-/***/ }),
-
-/***/ 9023:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-var async = __nccwpck_require__(2794)
-  , abort = __nccwpck_require__(1700)
-  ;
-
-// API
-module.exports = iterate;
-
-/**
- * Iterates over each job object
- *
- * @param {array|object} list - array or object (named list) to iterate over
- * @param {function} iterator - iterator to run
- * @param {object} state - current job status
- * @param {function} callback - invoked when all elements processed
- */
-function iterate(list, iterator, state, callback)
-{
-  // store current index
-  var key = state['keyedList'] ? state['keyedList'][state.index] : state.index;
-
-  state.jobs[key] = runJob(iterator, key, list[key], function(error, output)
-  {
-    // don't repeat yourself
-    // skip secondary callbacks
-    if (!(key in state.jobs))
-    {
-      return;
-    }
-
-    // clean up jobs
-    delete state.jobs[key];
-
-    if (error)
-    {
-      // don't process rest of the results
-      // stop still active jobs
-      // and reset the list
-      abort(state);
-    }
-    else
-    {
-      state.results[key] = output;
-    }
-
-    // return salvaged results
-    callback(error, state.results);
-  });
-}
-
-/**
- * Runs iterator over provided job element
- *
- * @param   {function} iterator - iterator to invoke
- * @param   {string|number} key - key/index of the element in the list of jobs
- * @param   {mixed} item - job description
- * @param   {function} callback - invoked after iterator is done with the job
- * @returns {function|mixed} - job abort function or something else
- */
-function runJob(iterator, key, item, callback)
-{
-  var aborter;
-
-  // allow shortcut if iterator expects only two arguments
-  if (iterator.length == 2)
-  {
-    aborter = iterator(item, async(callback));
-  }
-  // otherwise go with full three arguments
-  else
-  {
-    aborter = iterator(item, key, async(callback));
-  }
-
-  return aborter;
-}
-
-
-/***/ }),
-
-/***/ 2474:
-/***/ ((module) => {
-
-// API
-module.exports = state;
-
-/**
- * Creates initial state object
- * for iteration over list
- *
- * @param   {array|object} list - list to iterate over
- * @param   {function|null} sortMethod - function to use for keys sort,
- *                                     or `null` to keep them as is
- * @returns {object} - initial state object
- */
-function state(list, sortMethod)
-{
-  var isNamedList = !Array.isArray(list)
-    , initState =
-    {
-      index    : 0,
-      keyedList: isNamedList || sortMethod ? Object.keys(list) : null,
-      jobs     : {},
-      results  : isNamedList ? {} : [],
-      size     : isNamedList ? Object.keys(list).length : list.length
-    }
-    ;
-
-  if (sortMethod)
-  {
-    // sort array keys based on it's values
-    // sort object's keys just on own merit
-    initState.keyedList.sort(isNamedList ? sortMethod : function(a, b)
-    {
-      return sortMethod(list[a], list[b]);
-    });
-  }
-
-  return initState;
-}
-
-
-/***/ }),
-
-/***/ 7942:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-var abort = __nccwpck_require__(1700)
-  , async = __nccwpck_require__(2794)
-  ;
-
-// API
-module.exports = terminator;
-
-/**
- * Terminates jobs in the attached state context
- *
- * @this  AsyncKitState#
- * @param {function} callback - final callback to invoke after termination
- */
-function terminator(callback)
-{
-  if (!Object.keys(this.jobs).length)
-  {
-    return;
-  }
-
-  // fast forward iteration index
-  this.index = this.size;
-
-  // abort jobs
-  abort(this);
-
-  // send back results we have so far
-  async(callback)(null, this.results);
-}
-
-
-/***/ }),
-
-/***/ 8210:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-var iterate    = __nccwpck_require__(9023)
-  , initState  = __nccwpck_require__(2474)
-  , terminator = __nccwpck_require__(7942)
-  ;
-
-// Public API
-module.exports = parallel;
-
-/**
- * Runs iterator over provided array elements in parallel
- *
- * @param   {array|object} list - array or object (named list) to iterate over
- * @param   {function} iterator - iterator to run
- * @param   {function} callback - invoked when all elements processed
- * @returns {function} - jobs terminator
- */
-function parallel(list, iterator, callback)
-{
-  var state = initState(list);
-
-  while (state.index < (state['keyedList'] || list).length)
-  {
-    iterate(list, iterator, state, function(error, result)
-    {
-      if (error)
-      {
-        callback(error, result);
-        return;
-      }
-
-      // looks like it's the last one
-      if (Object.keys(state.jobs).length === 0)
-      {
-        callback(null, state.results);
-        return;
-      }
-    });
-
-    state.index++;
-  }
-
-  return terminator.bind(state, callback);
-}
-
-
-/***/ }),
-
-/***/ 445:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-var serialOrdered = __nccwpck_require__(3578);
-
-// Public API
-module.exports = serial;
-
-/**
- * Runs iterator over provided array elements in series
- *
- * @param   {array|object} list - array or object (named list) to iterate over
- * @param   {function} iterator - iterator to run
- * @param   {function} callback - invoked when all elements processed
- * @returns {function} - jobs terminator
- */
-function serial(list, iterator, callback)
-{
-  return serialOrdered(list, iterator, null, callback);
-}
-
-
-/***/ }),
-
-/***/ 3578:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-var iterate    = __nccwpck_require__(9023)
-  , initState  = __nccwpck_require__(2474)
-  , terminator = __nccwpck_require__(7942)
-  ;
-
-// Public API
-module.exports = serialOrdered;
-// sorting helpers
-module.exports.ascending  = ascending;
-module.exports.descending = descending;
-
-/**
- * Runs iterator over provided sorted array elements in series
- *
- * @param   {array|object} list - array or object (named list) to iterate over
- * @param   {function} iterator - iterator to run
- * @param   {function} sortMethod - custom sort function
- * @param   {function} callback - invoked when all elements processed
- * @returns {function} - jobs terminator
- */
-function serialOrdered(list, iterator, sortMethod, callback)
-{
-  var state = initState(list, sortMethod);
-
-  iterate(list, iterator, state, function iteratorHandler(error, result)
-  {
-    if (error)
-    {
-      callback(error, result);
-      return;
-    }
-
-    state.index++;
-
-    // are we there yet?
-    if (state.index < (state['keyedList'] || list).length)
-    {
-      iterate(list, iterator, state, iteratorHandler);
-      return;
-    }
-
-    // done here
-    callback(null, state.results);
-  });
-
-  return terminator.bind(state, callback);
-}
-
-/*
- * -- Sort methods
- */
-
-/**
- * sort helper to sort array elements in ascending order
- *
- * @param   {mixed} a - an item to compare
- * @param   {mixed} b - an item to compare
- * @returns {number} - comparison result
- */
-function ascending(a, b)
-{
-  return a < b ? -1 : a > b ? 1 : 0;
-}
-
-/**
- * sort helper to sort array elements in descending order
- *
- * @param   {mixed} a - an item to compare
- * @param   {mixed} b - an item to compare
- * @returns {number} - comparison result
- */
-function descending(a, b)
-{
-  return -1 * ascending(a, b);
-}
 
 
 /***/ }),
@@ -3457,6 +3322,850 @@ exports.constantCase = constantCase;
 
 /***/ }),
 
+/***/ 8222:
+/***/ ((module, exports, __nccwpck_require__) => {
+
+/* eslint-env browser */
+
+/**
+ * This is the web browser implementation of `debug()`.
+ */
+
+exports.formatArgs = formatArgs;
+exports.save = save;
+exports.load = load;
+exports.useColors = useColors;
+exports.storage = localstorage();
+exports.destroy = (() => {
+	let warned = false;
+
+	return () => {
+		if (!warned) {
+			warned = true;
+			console.warn('Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.');
+		}
+	};
+})();
+
+/**
+ * Colors.
+ */
+
+exports.colors = [
+	'#0000CC',
+	'#0000FF',
+	'#0033CC',
+	'#0033FF',
+	'#0066CC',
+	'#0066FF',
+	'#0099CC',
+	'#0099FF',
+	'#00CC00',
+	'#00CC33',
+	'#00CC66',
+	'#00CC99',
+	'#00CCCC',
+	'#00CCFF',
+	'#3300CC',
+	'#3300FF',
+	'#3333CC',
+	'#3333FF',
+	'#3366CC',
+	'#3366FF',
+	'#3399CC',
+	'#3399FF',
+	'#33CC00',
+	'#33CC33',
+	'#33CC66',
+	'#33CC99',
+	'#33CCCC',
+	'#33CCFF',
+	'#6600CC',
+	'#6600FF',
+	'#6633CC',
+	'#6633FF',
+	'#66CC00',
+	'#66CC33',
+	'#9900CC',
+	'#9900FF',
+	'#9933CC',
+	'#9933FF',
+	'#99CC00',
+	'#99CC33',
+	'#CC0000',
+	'#CC0033',
+	'#CC0066',
+	'#CC0099',
+	'#CC00CC',
+	'#CC00FF',
+	'#CC3300',
+	'#CC3333',
+	'#CC3366',
+	'#CC3399',
+	'#CC33CC',
+	'#CC33FF',
+	'#CC6600',
+	'#CC6633',
+	'#CC9900',
+	'#CC9933',
+	'#CCCC00',
+	'#CCCC33',
+	'#FF0000',
+	'#FF0033',
+	'#FF0066',
+	'#FF0099',
+	'#FF00CC',
+	'#FF00FF',
+	'#FF3300',
+	'#FF3333',
+	'#FF3366',
+	'#FF3399',
+	'#FF33CC',
+	'#FF33FF',
+	'#FF6600',
+	'#FF6633',
+	'#FF9900',
+	'#FF9933',
+	'#FFCC00',
+	'#FFCC33'
+];
+
+/**
+ * Currently only WebKit-based Web Inspectors, Firefox >= v31,
+ * and the Firebug extension (any Firefox version) are known
+ * to support "%c" CSS customizations.
+ *
+ * TODO: add a `localStorage` variable to explicitly enable/disable colors
+ */
+
+// eslint-disable-next-line complexity
+function useColors() {
+	// NB: In an Electron preload script, document will be defined but not fully
+	// initialized. Since we know we're in Chrome, we'll just detect this case
+	// explicitly
+	if (typeof window !== 'undefined' && window.process && (window.process.type === 'renderer' || window.process.__nwjs)) {
+		return true;
+	}
+
+	// Internet Explorer and Edge do not support colors.
+	if (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/(edge|trident)\/(\d+)/)) {
+		return false;
+	}
+
+	// Is webkit? http://stackoverflow.com/a/16459606/376773
+	// document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
+	return (typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance) ||
+		// Is firebug? http://stackoverflow.com/a/398120/376773
+		(typeof window !== 'undefined' && window.console && (window.console.firebug || (window.console.exception && window.console.table))) ||
+		// Is firefox >= v31?
+		// https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31) ||
+		// Double check webkit in userAgent just in case we are in a worker
+		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/));
+}
+
+/**
+ * Colorize log arguments if enabled.
+ *
+ * @api public
+ */
+
+function formatArgs(args) {
+	args[0] = (this.useColors ? '%c' : '') +
+		this.namespace +
+		(this.useColors ? ' %c' : ' ') +
+		args[0] +
+		(this.useColors ? '%c ' : ' ') +
+		'+' + module.exports.humanize(this.diff);
+
+	if (!this.useColors) {
+		return;
+	}
+
+	const c = 'color: ' + this.color;
+	args.splice(1, 0, c, 'color: inherit');
+
+	// The final "%c" is somewhat tricky, because there could be other
+	// arguments passed either before or after the %c, so we need to
+	// figure out the correct index to insert the CSS into
+	let index = 0;
+	let lastC = 0;
+	args[0].replace(/%[a-zA-Z%]/g, match => {
+		if (match === '%%') {
+			return;
+		}
+		index++;
+		if (match === '%c') {
+			// We only are interested in the *last* %c
+			// (the user may have provided their own)
+			lastC = index;
+		}
+	});
+
+	args.splice(lastC, 0, c);
+}
+
+/**
+ * Invokes `console.debug()` when available.
+ * No-op when `console.debug` is not a "function".
+ * If `console.debug` is not available, falls back
+ * to `console.log`.
+ *
+ * @api public
+ */
+exports.log = console.debug || console.log || (() => {});
+
+/**
+ * Save `namespaces`.
+ *
+ * @param {String} namespaces
+ * @api private
+ */
+function save(namespaces) {
+	try {
+		if (namespaces) {
+			exports.storage.setItem('debug', namespaces);
+		} else {
+			exports.storage.removeItem('debug');
+		}
+	} catch (error) {
+		// Swallow
+		// XXX (@Qix-) should we be logging these?
+	}
+}
+
+/**
+ * Load `namespaces`.
+ *
+ * @return {String} returns the previously persisted debug modes
+ * @api private
+ */
+function load() {
+	let r;
+	try {
+		r = exports.storage.getItem('debug');
+	} catch (error) {
+		// Swallow
+		// XXX (@Qix-) should we be logging these?
+	}
+
+	// If debug isn't set in LS, and we're in Electron, try to load $DEBUG
+	if (!r && typeof process !== 'undefined' && 'env' in process) {
+		r = process.env.DEBUG;
+	}
+
+	return r;
+}
+
+/**
+ * Localstorage attempts to return the localstorage.
+ *
+ * This is necessary because safari throws
+ * when a user disables cookies/localstorage
+ * and you attempt to access it.
+ *
+ * @return {LocalStorage}
+ * @api private
+ */
+
+function localstorage() {
+	try {
+		// TVMLKit (Apple TV JS Runtime) does not have a window object, just localStorage in the global context
+		// The Browser also has localStorage in the global context.
+		return localStorage;
+	} catch (error) {
+		// Swallow
+		// XXX (@Qix-) should we be logging these?
+	}
+}
+
+module.exports = __nccwpck_require__(6243)(exports);
+
+const {formatters} = module.exports;
+
+/**
+ * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
+ */
+
+formatters.j = function (v) {
+	try {
+		return JSON.stringify(v);
+	} catch (error) {
+		return '[UnexpectedJSONParseError]: ' + error.message;
+	}
+};
+
+
+/***/ }),
+
+/***/ 6243:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+
+/**
+ * This is the common logic for both the Node.js and web browser
+ * implementations of `debug()`.
+ */
+
+function setup(env) {
+	createDebug.debug = createDebug;
+	createDebug.default = createDebug;
+	createDebug.coerce = coerce;
+	createDebug.disable = disable;
+	createDebug.enable = enable;
+	createDebug.enabled = enabled;
+	createDebug.humanize = __nccwpck_require__(900);
+	createDebug.destroy = destroy;
+
+	Object.keys(env).forEach(key => {
+		createDebug[key] = env[key];
+	});
+
+	/**
+	* The currently active debug mode names, and names to skip.
+	*/
+
+	createDebug.names = [];
+	createDebug.skips = [];
+
+	/**
+	* Map of special "%n" handling functions, for the debug "format" argument.
+	*
+	* Valid key names are a single, lower or upper-case letter, i.e. "n" and "N".
+	*/
+	createDebug.formatters = {};
+
+	/**
+	* Selects a color for a debug namespace
+	* @param {String} namespace The namespace string for the debug instance to be colored
+	* @return {Number|String} An ANSI color code for the given namespace
+	* @api private
+	*/
+	function selectColor(namespace) {
+		let hash = 0;
+
+		for (let i = 0; i < namespace.length; i++) {
+			hash = ((hash << 5) - hash) + namespace.charCodeAt(i);
+			hash |= 0; // Convert to 32bit integer
+		}
+
+		return createDebug.colors[Math.abs(hash) % createDebug.colors.length];
+	}
+	createDebug.selectColor = selectColor;
+
+	/**
+	* Create a debugger with the given `namespace`.
+	*
+	* @param {String} namespace
+	* @return {Function}
+	* @api public
+	*/
+	function createDebug(namespace) {
+		let prevTime;
+		let enableOverride = null;
+		let namespacesCache;
+		let enabledCache;
+
+		function debug(...args) {
+			// Disabled?
+			if (!debug.enabled) {
+				return;
+			}
+
+			const self = debug;
+
+			// Set `diff` timestamp
+			const curr = Number(new Date());
+			const ms = curr - (prevTime || curr);
+			self.diff = ms;
+			self.prev = prevTime;
+			self.curr = curr;
+			prevTime = curr;
+
+			args[0] = createDebug.coerce(args[0]);
+
+			if (typeof args[0] !== 'string') {
+				// Anything else let's inspect with %O
+				args.unshift('%O');
+			}
+
+			// Apply any `formatters` transformations
+			let index = 0;
+			args[0] = args[0].replace(/%([a-zA-Z%])/g, (match, format) => {
+				// If we encounter an escaped % then don't increase the array index
+				if (match === '%%') {
+					return '%';
+				}
+				index++;
+				const formatter = createDebug.formatters[format];
+				if (typeof formatter === 'function') {
+					const val = args[index];
+					match = formatter.call(self, val);
+
+					// Now we need to remove `args[index]` since it's inlined in the `format`
+					args.splice(index, 1);
+					index--;
+				}
+				return match;
+			});
+
+			// Apply env-specific formatting (colors, etc.)
+			createDebug.formatArgs.call(self, args);
+
+			const logFn = self.log || createDebug.log;
+			logFn.apply(self, args);
+		}
+
+		debug.namespace = namespace;
+		debug.useColors = createDebug.useColors();
+		debug.color = createDebug.selectColor(namespace);
+		debug.extend = extend;
+		debug.destroy = createDebug.destroy; // XXX Temporary. Will be removed in the next major release.
+
+		Object.defineProperty(debug, 'enabled', {
+			enumerable: true,
+			configurable: false,
+			get: () => {
+				if (enableOverride !== null) {
+					return enableOverride;
+				}
+				if (namespacesCache !== createDebug.namespaces) {
+					namespacesCache = createDebug.namespaces;
+					enabledCache = createDebug.enabled(namespace);
+				}
+
+				return enabledCache;
+			},
+			set: v => {
+				enableOverride = v;
+			}
+		});
+
+		// Env-specific initialization logic for debug instances
+		if (typeof createDebug.init === 'function') {
+			createDebug.init(debug);
+		}
+
+		return debug;
+	}
+
+	function extend(namespace, delimiter) {
+		const newDebug = createDebug(this.namespace + (typeof delimiter === 'undefined' ? ':' : delimiter) + namespace);
+		newDebug.log = this.log;
+		return newDebug;
+	}
+
+	/**
+	* Enables a debug mode by namespaces. This can include modes
+	* separated by a colon and wildcards.
+	*
+	* @param {String} namespaces
+	* @api public
+	*/
+	function enable(namespaces) {
+		createDebug.save(namespaces);
+		createDebug.namespaces = namespaces;
+
+		createDebug.names = [];
+		createDebug.skips = [];
+
+		let i;
+		const split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
+		const len = split.length;
+
+		for (i = 0; i < len; i++) {
+			if (!split[i]) {
+				// ignore empty strings
+				continue;
+			}
+
+			namespaces = split[i].replace(/\*/g, '.*?');
+
+			if (namespaces[0] === '-') {
+				createDebug.skips.push(new RegExp('^' + namespaces.slice(1) + '$'));
+			} else {
+				createDebug.names.push(new RegExp('^' + namespaces + '$'));
+			}
+		}
+	}
+
+	/**
+	* Disable debug output.
+	*
+	* @return {String} namespaces
+	* @api public
+	*/
+	function disable() {
+		const namespaces = [
+			...createDebug.names.map(toNamespace),
+			...createDebug.skips.map(toNamespace).map(namespace => '-' + namespace)
+		].join(',');
+		createDebug.enable('');
+		return namespaces;
+	}
+
+	/**
+	* Returns true if the given mode name is enabled, false otherwise.
+	*
+	* @param {String} name
+	* @return {Boolean}
+	* @api public
+	*/
+	function enabled(name) {
+		if (name[name.length - 1] === '*') {
+			return true;
+		}
+
+		let i;
+		let len;
+
+		for (i = 0, len = createDebug.skips.length; i < len; i++) {
+			if (createDebug.skips[i].test(name)) {
+				return false;
+			}
+		}
+
+		for (i = 0, len = createDebug.names.length; i < len; i++) {
+			if (createDebug.names[i].test(name)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	* Convert regexp to namespace
+	*
+	* @param {RegExp} regxep
+	* @return {String} namespace
+	* @api private
+	*/
+	function toNamespace(regexp) {
+		return regexp.toString()
+			.substring(2, regexp.toString().length - 2)
+			.replace(/\.\*\?$/, '*');
+	}
+
+	/**
+	* Coerce `val`.
+	*
+	* @param {Mixed} val
+	* @return {Mixed}
+	* @api private
+	*/
+	function coerce(val) {
+		if (val instanceof Error) {
+			return val.stack || val.message;
+		}
+		return val;
+	}
+
+	/**
+	* XXX DO NOT USE. This is a temporary stub function.
+	* XXX It WILL be removed in the next major release.
+	*/
+	function destroy() {
+		console.warn('Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.');
+	}
+
+	createDebug.enable(createDebug.load());
+
+	return createDebug;
+}
+
+module.exports = setup;
+
+
+/***/ }),
+
+/***/ 8237:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+/**
+ * Detect Electron renderer / nwjs process, which is node, but we should
+ * treat as a browser.
+ */
+
+if (typeof process === 'undefined' || process.type === 'renderer' || process.browser === true || process.__nwjs) {
+	module.exports = __nccwpck_require__(8222);
+} else {
+	module.exports = __nccwpck_require__(4874);
+}
+
+
+/***/ }),
+
+/***/ 4874:
+/***/ ((module, exports, __nccwpck_require__) => {
+
+/**
+ * Module dependencies.
+ */
+
+const tty = __nccwpck_require__(3867);
+const util = __nccwpck_require__(1669);
+
+/**
+ * This is the Node.js implementation of `debug()`.
+ */
+
+exports.init = init;
+exports.log = log;
+exports.formatArgs = formatArgs;
+exports.save = save;
+exports.load = load;
+exports.useColors = useColors;
+exports.destroy = util.deprecate(
+	() => {},
+	'Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.'
+);
+
+/**
+ * Colors.
+ */
+
+exports.colors = [6, 2, 3, 4, 5, 1];
+
+try {
+	// Optional dependency (as in, doesn't need to be installed, NOT like optionalDependencies in package.json)
+	// eslint-disable-next-line import/no-extraneous-dependencies
+	const supportsColor = __nccwpck_require__(9318);
+
+	if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
+		exports.colors = [
+			20,
+			21,
+			26,
+			27,
+			32,
+			33,
+			38,
+			39,
+			40,
+			41,
+			42,
+			43,
+			44,
+			45,
+			56,
+			57,
+			62,
+			63,
+			68,
+			69,
+			74,
+			75,
+			76,
+			77,
+			78,
+			79,
+			80,
+			81,
+			92,
+			93,
+			98,
+			99,
+			112,
+			113,
+			128,
+			129,
+			134,
+			135,
+			148,
+			149,
+			160,
+			161,
+			162,
+			163,
+			164,
+			165,
+			166,
+			167,
+			168,
+			169,
+			170,
+			171,
+			172,
+			173,
+			178,
+			179,
+			184,
+			185,
+			196,
+			197,
+			198,
+			199,
+			200,
+			201,
+			202,
+			203,
+			204,
+			205,
+			206,
+			207,
+			208,
+			209,
+			214,
+			215,
+			220,
+			221
+		];
+	}
+} catch (error) {
+	// Swallow - we only care if `supports-color` is available; it doesn't have to be.
+}
+
+/**
+ * Build up the default `inspectOpts` object from the environment variables.
+ *
+ *   $ DEBUG_COLORS=no DEBUG_DEPTH=10 DEBUG_SHOW_HIDDEN=enabled node script.js
+ */
+
+exports.inspectOpts = Object.keys(process.env).filter(key => {
+	return /^debug_/i.test(key);
+}).reduce((obj, key) => {
+	// Camel-case
+	const prop = key
+		.substring(6)
+		.toLowerCase()
+		.replace(/_([a-z])/g, (_, k) => {
+			return k.toUpperCase();
+		});
+
+	// Coerce string value into JS value
+	let val = process.env[key];
+	if (/^(yes|on|true|enabled)$/i.test(val)) {
+		val = true;
+	} else if (/^(no|off|false|disabled)$/i.test(val)) {
+		val = false;
+	} else if (val === 'null') {
+		val = null;
+	} else {
+		val = Number(val);
+	}
+
+	obj[prop] = val;
+	return obj;
+}, {});
+
+/**
+ * Is stdout a TTY? Colored output is enabled when `true`.
+ */
+
+function useColors() {
+	return 'colors' in exports.inspectOpts ?
+		Boolean(exports.inspectOpts.colors) :
+		tty.isatty(process.stderr.fd);
+}
+
+/**
+ * Adds ANSI color escape codes if enabled.
+ *
+ * @api public
+ */
+
+function formatArgs(args) {
+	const {namespace: name, useColors} = this;
+
+	if (useColors) {
+		const c = this.color;
+		const colorCode = '\u001B[3' + (c < 8 ? c : '8;5;' + c);
+		const prefix = `  ${colorCode};1m${name} \u001B[0m`;
+
+		args[0] = prefix + args[0].split('\n').join('\n' + prefix);
+		args.push(colorCode + 'm+' + module.exports.humanize(this.diff) + '\u001B[0m');
+	} else {
+		args[0] = getDate() + name + ' ' + args[0];
+	}
+}
+
+function getDate() {
+	if (exports.inspectOpts.hideDate) {
+		return '';
+	}
+	return new Date().toISOString() + ' ';
+}
+
+/**
+ * Invokes `util.format()` with the specified arguments and writes to stderr.
+ */
+
+function log(...args) {
+	return process.stderr.write(util.format(...args) + '\n');
+}
+
+/**
+ * Save `namespaces`.
+ *
+ * @param {String} namespaces
+ * @api private
+ */
+function save(namespaces) {
+	if (namespaces) {
+		process.env.DEBUG = namespaces;
+	} else {
+		// If you set a process.env field to null or undefined, it gets cast to the
+		// string 'null' or 'undefined'. Just delete instead.
+		delete process.env.DEBUG;
+	}
+}
+
+/**
+ * Load `namespaces`.
+ *
+ * @return {String} returns the previously persisted debug modes
+ * @api private
+ */
+
+function load() {
+	return process.env.DEBUG;
+}
+
+/**
+ * Init logic for `debug` instances.
+ *
+ * Create a new `inspectOpts` object in case `useColors` is set
+ * differently for a particular `debug` instance.
+ */
+
+function init(debug) {
+	debug.inspectOpts = {};
+
+	const keys = Object.keys(exports.inspectOpts);
+	for (let i = 0; i < keys.length; i++) {
+		debug.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
+	}
+}
+
+module.exports = __nccwpck_require__(6243)(exports);
+
+const {formatters} = module.exports;
+
+/**
+ * Map %o to `util.inspect()`, all on a single line.
+ */
+
+formatters.o = function (v) {
+	this.inspectOpts.colors = this.useColors;
+	return util.inspect(v, this.inspectOpts)
+		.split('\n')
+		.map(str => str.trim())
+		.join(' ');
+};
+
+/**
+ * Map %O to `util.inspect()`, allowing multiple lines if needed.
+ */
+
+formatters.O = function (v) {
+	this.inspectOpts.colors = this.useColors;
+	return util.inspect(v, this.inspectOpts);
+};
+
+
+/***/ }),
+
 /***/ 8611:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -3586,885 +4295,6 @@ function dotCase(input, options) {
 }
 exports.dotCase = dotCase;
 //# sourceMappingURL=index.js.map
-
-/***/ }),
-
-/***/ 4697:
-/***/ ((module, exports) => {
-
-"use strict";
-/**
- * @author Toru Nagashima <https://github.com/mysticatea>
- * @copyright 2015 Toru Nagashima. All rights reserved.
- * See LICENSE file in root directory for full license.
- */
-
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-
-/**
- * @typedef {object} PrivateData
- * @property {EventTarget} eventTarget The event target.
- * @property {{type:string}} event The original event object.
- * @property {number} eventPhase The current event phase.
- * @property {EventTarget|null} currentTarget The current event target.
- * @property {boolean} canceled The flag to prevent default.
- * @property {boolean} stopped The flag to stop propagation.
- * @property {boolean} immediateStopped The flag to stop propagation immediately.
- * @property {Function|null} passiveListener The listener if the current listener is passive. Otherwise this is null.
- * @property {number} timeStamp The unix time.
- * @private
- */
-
-/**
- * Private data for event wrappers.
- * @type {WeakMap<Event, PrivateData>}
- * @private
- */
-const privateData = new WeakMap();
-
-/**
- * Cache for wrapper classes.
- * @type {WeakMap<Object, Function>}
- * @private
- */
-const wrappers = new WeakMap();
-
-/**
- * Get private data.
- * @param {Event} event The event object to get private data.
- * @returns {PrivateData} The private data of the event.
- * @private
- */
-function pd(event) {
-    const retv = privateData.get(event);
-    console.assert(
-        retv != null,
-        "'this' is expected an Event object, but got",
-        event
-    );
-    return retv
-}
-
-/**
- * https://dom.spec.whatwg.org/#set-the-canceled-flag
- * @param data {PrivateData} private data.
- */
-function setCancelFlag(data) {
-    if (data.passiveListener != null) {
-        if (
-            typeof console !== "undefined" &&
-            typeof console.error === "function"
-        ) {
-            console.error(
-                "Unable to preventDefault inside passive event listener invocation.",
-                data.passiveListener
-            );
-        }
-        return
-    }
-    if (!data.event.cancelable) {
-        return
-    }
-
-    data.canceled = true;
-    if (typeof data.event.preventDefault === "function") {
-        data.event.preventDefault();
-    }
-}
-
-/**
- * @see https://dom.spec.whatwg.org/#interface-event
- * @private
- */
-/**
- * The event wrapper.
- * @constructor
- * @param {EventTarget} eventTarget The event target of this dispatching.
- * @param {Event|{type:string}} event The original event to wrap.
- */
-function Event(eventTarget, event) {
-    privateData.set(this, {
-        eventTarget,
-        event,
-        eventPhase: 2,
-        currentTarget: eventTarget,
-        canceled: false,
-        stopped: false,
-        immediateStopped: false,
-        passiveListener: null,
-        timeStamp: event.timeStamp || Date.now(),
-    });
-
-    // https://heycam.github.io/webidl/#Unforgeable
-    Object.defineProperty(this, "isTrusted", { value: false, enumerable: true });
-
-    // Define accessors
-    const keys = Object.keys(event);
-    for (let i = 0; i < keys.length; ++i) {
-        const key = keys[i];
-        if (!(key in this)) {
-            Object.defineProperty(this, key, defineRedirectDescriptor(key));
-        }
-    }
-}
-
-// Should be enumerable, but class methods are not enumerable.
-Event.prototype = {
-    /**
-     * The type of this event.
-     * @type {string}
-     */
-    get type() {
-        return pd(this).event.type
-    },
-
-    /**
-     * The target of this event.
-     * @type {EventTarget}
-     */
-    get target() {
-        return pd(this).eventTarget
-    },
-
-    /**
-     * The target of this event.
-     * @type {EventTarget}
-     */
-    get currentTarget() {
-        return pd(this).currentTarget
-    },
-
-    /**
-     * @returns {EventTarget[]} The composed path of this event.
-     */
-    composedPath() {
-        const currentTarget = pd(this).currentTarget;
-        if (currentTarget == null) {
-            return []
-        }
-        return [currentTarget]
-    },
-
-    /**
-     * Constant of NONE.
-     * @type {number}
-     */
-    get NONE() {
-        return 0
-    },
-
-    /**
-     * Constant of CAPTURING_PHASE.
-     * @type {number}
-     */
-    get CAPTURING_PHASE() {
-        return 1
-    },
-
-    /**
-     * Constant of AT_TARGET.
-     * @type {number}
-     */
-    get AT_TARGET() {
-        return 2
-    },
-
-    /**
-     * Constant of BUBBLING_PHASE.
-     * @type {number}
-     */
-    get BUBBLING_PHASE() {
-        return 3
-    },
-
-    /**
-     * The target of this event.
-     * @type {number}
-     */
-    get eventPhase() {
-        return pd(this).eventPhase
-    },
-
-    /**
-     * Stop event bubbling.
-     * @returns {void}
-     */
-    stopPropagation() {
-        const data = pd(this);
-
-        data.stopped = true;
-        if (typeof data.event.stopPropagation === "function") {
-            data.event.stopPropagation();
-        }
-    },
-
-    /**
-     * Stop event bubbling.
-     * @returns {void}
-     */
-    stopImmediatePropagation() {
-        const data = pd(this);
-
-        data.stopped = true;
-        data.immediateStopped = true;
-        if (typeof data.event.stopImmediatePropagation === "function") {
-            data.event.stopImmediatePropagation();
-        }
-    },
-
-    /**
-     * The flag to be bubbling.
-     * @type {boolean}
-     */
-    get bubbles() {
-        return Boolean(pd(this).event.bubbles)
-    },
-
-    /**
-     * The flag to be cancelable.
-     * @type {boolean}
-     */
-    get cancelable() {
-        return Boolean(pd(this).event.cancelable)
-    },
-
-    /**
-     * Cancel this event.
-     * @returns {void}
-     */
-    preventDefault() {
-        setCancelFlag(pd(this));
-    },
-
-    /**
-     * The flag to indicate cancellation state.
-     * @type {boolean}
-     */
-    get defaultPrevented() {
-        return pd(this).canceled
-    },
-
-    /**
-     * The flag to be composed.
-     * @type {boolean}
-     */
-    get composed() {
-        return Boolean(pd(this).event.composed)
-    },
-
-    /**
-     * The unix time of this event.
-     * @type {number}
-     */
-    get timeStamp() {
-        return pd(this).timeStamp
-    },
-
-    /**
-     * The target of this event.
-     * @type {EventTarget}
-     * @deprecated
-     */
-    get srcElement() {
-        return pd(this).eventTarget
-    },
-
-    /**
-     * The flag to stop event bubbling.
-     * @type {boolean}
-     * @deprecated
-     */
-    get cancelBubble() {
-        return pd(this).stopped
-    },
-    set cancelBubble(value) {
-        if (!value) {
-            return
-        }
-        const data = pd(this);
-
-        data.stopped = true;
-        if (typeof data.event.cancelBubble === "boolean") {
-            data.event.cancelBubble = true;
-        }
-    },
-
-    /**
-     * The flag to indicate cancellation state.
-     * @type {boolean}
-     * @deprecated
-     */
-    get returnValue() {
-        return !pd(this).canceled
-    },
-    set returnValue(value) {
-        if (!value) {
-            setCancelFlag(pd(this));
-        }
-    },
-
-    /**
-     * Initialize this event object. But do nothing under event dispatching.
-     * @param {string} type The event type.
-     * @param {boolean} [bubbles=false] The flag to be possible to bubble up.
-     * @param {boolean} [cancelable=false] The flag to be possible to cancel.
-     * @deprecated
-     */
-    initEvent() {
-        // Do nothing.
-    },
-};
-
-// `constructor` is not enumerable.
-Object.defineProperty(Event.prototype, "constructor", {
-    value: Event,
-    configurable: true,
-    writable: true,
-});
-
-// Ensure `event instanceof window.Event` is `true`.
-if (typeof window !== "undefined" && typeof window.Event !== "undefined") {
-    Object.setPrototypeOf(Event.prototype, window.Event.prototype);
-
-    // Make association for wrappers.
-    wrappers.set(window.Event.prototype, Event);
-}
-
-/**
- * Get the property descriptor to redirect a given property.
- * @param {string} key Property name to define property descriptor.
- * @returns {PropertyDescriptor} The property descriptor to redirect the property.
- * @private
- */
-function defineRedirectDescriptor(key) {
-    return {
-        get() {
-            return pd(this).event[key]
-        },
-        set(value) {
-            pd(this).event[key] = value;
-        },
-        configurable: true,
-        enumerable: true,
-    }
-}
-
-/**
- * Get the property descriptor to call a given method property.
- * @param {string} key Property name to define property descriptor.
- * @returns {PropertyDescriptor} The property descriptor to call the method property.
- * @private
- */
-function defineCallDescriptor(key) {
-    return {
-        value() {
-            const event = pd(this).event;
-            return event[key].apply(event, arguments)
-        },
-        configurable: true,
-        enumerable: true,
-    }
-}
-
-/**
- * Define new wrapper class.
- * @param {Function} BaseEvent The base wrapper class.
- * @param {Object} proto The prototype of the original event.
- * @returns {Function} The defined wrapper class.
- * @private
- */
-function defineWrapper(BaseEvent, proto) {
-    const keys = Object.keys(proto);
-    if (keys.length === 0) {
-        return BaseEvent
-    }
-
-    /** CustomEvent */
-    function CustomEvent(eventTarget, event) {
-        BaseEvent.call(this, eventTarget, event);
-    }
-
-    CustomEvent.prototype = Object.create(BaseEvent.prototype, {
-        constructor: { value: CustomEvent, configurable: true, writable: true },
-    });
-
-    // Define accessors.
-    for (let i = 0; i < keys.length; ++i) {
-        const key = keys[i];
-        if (!(key in BaseEvent.prototype)) {
-            const descriptor = Object.getOwnPropertyDescriptor(proto, key);
-            const isFunc = typeof descriptor.value === "function";
-            Object.defineProperty(
-                CustomEvent.prototype,
-                key,
-                isFunc
-                    ? defineCallDescriptor(key)
-                    : defineRedirectDescriptor(key)
-            );
-        }
-    }
-
-    return CustomEvent
-}
-
-/**
- * Get the wrapper class of a given prototype.
- * @param {Object} proto The prototype of the original event to get its wrapper.
- * @returns {Function} The wrapper class.
- * @private
- */
-function getWrapper(proto) {
-    if (proto == null || proto === Object.prototype) {
-        return Event
-    }
-
-    let wrapper = wrappers.get(proto);
-    if (wrapper == null) {
-        wrapper = defineWrapper(getWrapper(Object.getPrototypeOf(proto)), proto);
-        wrappers.set(proto, wrapper);
-    }
-    return wrapper
-}
-
-/**
- * Wrap a given event to management a dispatching.
- * @param {EventTarget} eventTarget The event target of this dispatching.
- * @param {Object} event The event to wrap.
- * @returns {Event} The wrapper instance.
- * @private
- */
-function wrapEvent(eventTarget, event) {
-    const Wrapper = getWrapper(Object.getPrototypeOf(event));
-    return new Wrapper(eventTarget, event)
-}
-
-/**
- * Get the immediateStopped flag of a given event.
- * @param {Event} event The event to get.
- * @returns {boolean} The flag to stop propagation immediately.
- * @private
- */
-function isStopped(event) {
-    return pd(event).immediateStopped
-}
-
-/**
- * Set the current event phase of a given event.
- * @param {Event} event The event to set current target.
- * @param {number} eventPhase New event phase.
- * @returns {void}
- * @private
- */
-function setEventPhase(event, eventPhase) {
-    pd(event).eventPhase = eventPhase;
-}
-
-/**
- * Set the current target of a given event.
- * @param {Event} event The event to set current target.
- * @param {EventTarget|null} currentTarget New current target.
- * @returns {void}
- * @private
- */
-function setCurrentTarget(event, currentTarget) {
-    pd(event).currentTarget = currentTarget;
-}
-
-/**
- * Set a passive listener of a given event.
- * @param {Event} event The event to set current target.
- * @param {Function|null} passiveListener New passive listener.
- * @returns {void}
- * @private
- */
-function setPassiveListener(event, passiveListener) {
-    pd(event).passiveListener = passiveListener;
-}
-
-/**
- * @typedef {object} ListenerNode
- * @property {Function} listener
- * @property {1|2|3} listenerType
- * @property {boolean} passive
- * @property {boolean} once
- * @property {ListenerNode|null} next
- * @private
- */
-
-/**
- * @type {WeakMap<object, Map<string, ListenerNode>>}
- * @private
- */
-const listenersMap = new WeakMap();
-
-// Listener types
-const CAPTURE = 1;
-const BUBBLE = 2;
-const ATTRIBUTE = 3;
-
-/**
- * Check whether a given value is an object or not.
- * @param {any} x The value to check.
- * @returns {boolean} `true` if the value is an object.
- */
-function isObject(x) {
-    return x !== null && typeof x === "object" //eslint-disable-line no-restricted-syntax
-}
-
-/**
- * Get listeners.
- * @param {EventTarget} eventTarget The event target to get.
- * @returns {Map<string, ListenerNode>} The listeners.
- * @private
- */
-function getListeners(eventTarget) {
-    const listeners = listenersMap.get(eventTarget);
-    if (listeners == null) {
-        throw new TypeError(
-            "'this' is expected an EventTarget object, but got another value."
-        )
-    }
-    return listeners
-}
-
-/**
- * Get the property descriptor for the event attribute of a given event.
- * @param {string} eventName The event name to get property descriptor.
- * @returns {PropertyDescriptor} The property descriptor.
- * @private
- */
-function defineEventAttributeDescriptor(eventName) {
-    return {
-        get() {
-            const listeners = getListeners(this);
-            let node = listeners.get(eventName);
-            while (node != null) {
-                if (node.listenerType === ATTRIBUTE) {
-                    return node.listener
-                }
-                node = node.next;
-            }
-            return null
-        },
-
-        set(listener) {
-            if (typeof listener !== "function" && !isObject(listener)) {
-                listener = null; // eslint-disable-line no-param-reassign
-            }
-            const listeners = getListeners(this);
-
-            // Traverse to the tail while removing old value.
-            let prev = null;
-            let node = listeners.get(eventName);
-            while (node != null) {
-                if (node.listenerType === ATTRIBUTE) {
-                    // Remove old value.
-                    if (prev !== null) {
-                        prev.next = node.next;
-                    } else if (node.next !== null) {
-                        listeners.set(eventName, node.next);
-                    } else {
-                        listeners.delete(eventName);
-                    }
-                } else {
-                    prev = node;
-                }
-
-                node = node.next;
-            }
-
-            // Add new value.
-            if (listener !== null) {
-                const newNode = {
-                    listener,
-                    listenerType: ATTRIBUTE,
-                    passive: false,
-                    once: false,
-                    next: null,
-                };
-                if (prev === null) {
-                    listeners.set(eventName, newNode);
-                } else {
-                    prev.next = newNode;
-                }
-            }
-        },
-        configurable: true,
-        enumerable: true,
-    }
-}
-
-/**
- * Define an event attribute (e.g. `eventTarget.onclick`).
- * @param {Object} eventTargetPrototype The event target prototype to define an event attrbite.
- * @param {string} eventName The event name to define.
- * @returns {void}
- */
-function defineEventAttribute(eventTargetPrototype, eventName) {
-    Object.defineProperty(
-        eventTargetPrototype,
-        `on${eventName}`,
-        defineEventAttributeDescriptor(eventName)
-    );
-}
-
-/**
- * Define a custom EventTarget with event attributes.
- * @param {string[]} eventNames Event names for event attributes.
- * @returns {EventTarget} The custom EventTarget.
- * @private
- */
-function defineCustomEventTarget(eventNames) {
-    /** CustomEventTarget */
-    function CustomEventTarget() {
-        EventTarget.call(this);
-    }
-
-    CustomEventTarget.prototype = Object.create(EventTarget.prototype, {
-        constructor: {
-            value: CustomEventTarget,
-            configurable: true,
-            writable: true,
-        },
-    });
-
-    for (let i = 0; i < eventNames.length; ++i) {
-        defineEventAttribute(CustomEventTarget.prototype, eventNames[i]);
-    }
-
-    return CustomEventTarget
-}
-
-/**
- * EventTarget.
- *
- * - This is constructor if no arguments.
- * - This is a function which returns a CustomEventTarget constructor if there are arguments.
- *
- * For example:
- *
- *     class A extends EventTarget {}
- *     class B extends EventTarget("message") {}
- *     class C extends EventTarget("message", "error") {}
- *     class D extends EventTarget(["message", "error"]) {}
- */
-function EventTarget() {
-    /*eslint-disable consistent-return */
-    if (this instanceof EventTarget) {
-        listenersMap.set(this, new Map());
-        return
-    }
-    if (arguments.length === 1 && Array.isArray(arguments[0])) {
-        return defineCustomEventTarget(arguments[0])
-    }
-    if (arguments.length > 0) {
-        const types = new Array(arguments.length);
-        for (let i = 0; i < arguments.length; ++i) {
-            types[i] = arguments[i];
-        }
-        return defineCustomEventTarget(types)
-    }
-    throw new TypeError("Cannot call a class as a function")
-    /*eslint-enable consistent-return */
-}
-
-// Should be enumerable, but class methods are not enumerable.
-EventTarget.prototype = {
-    /**
-     * Add a given listener to this event target.
-     * @param {string} eventName The event name to add.
-     * @param {Function} listener The listener to add.
-     * @param {boolean|{capture?:boolean,passive?:boolean,once?:boolean}} [options] The options for this listener.
-     * @returns {void}
-     */
-    addEventListener(eventName, listener, options) {
-        if (listener == null) {
-            return
-        }
-        if (typeof listener !== "function" && !isObject(listener)) {
-            throw new TypeError("'listener' should be a function or an object.")
-        }
-
-        const listeners = getListeners(this);
-        const optionsIsObj = isObject(options);
-        const capture = optionsIsObj
-            ? Boolean(options.capture)
-            : Boolean(options);
-        const listenerType = capture ? CAPTURE : BUBBLE;
-        const newNode = {
-            listener,
-            listenerType,
-            passive: optionsIsObj && Boolean(options.passive),
-            once: optionsIsObj && Boolean(options.once),
-            next: null,
-        };
-
-        // Set it as the first node if the first node is null.
-        let node = listeners.get(eventName);
-        if (node === undefined) {
-            listeners.set(eventName, newNode);
-            return
-        }
-
-        // Traverse to the tail while checking duplication..
-        let prev = null;
-        while (node != null) {
-            if (
-                node.listener === listener &&
-                node.listenerType === listenerType
-            ) {
-                // Should ignore duplication.
-                return
-            }
-            prev = node;
-            node = node.next;
-        }
-
-        // Add it.
-        prev.next = newNode;
-    },
-
-    /**
-     * Remove a given listener from this event target.
-     * @param {string} eventName The event name to remove.
-     * @param {Function} listener The listener to remove.
-     * @param {boolean|{capture?:boolean,passive?:boolean,once?:boolean}} [options] The options for this listener.
-     * @returns {void}
-     */
-    removeEventListener(eventName, listener, options) {
-        if (listener == null) {
-            return
-        }
-
-        const listeners = getListeners(this);
-        const capture = isObject(options)
-            ? Boolean(options.capture)
-            : Boolean(options);
-        const listenerType = capture ? CAPTURE : BUBBLE;
-
-        let prev = null;
-        let node = listeners.get(eventName);
-        while (node != null) {
-            if (
-                node.listener === listener &&
-                node.listenerType === listenerType
-            ) {
-                if (prev !== null) {
-                    prev.next = node.next;
-                } else if (node.next !== null) {
-                    listeners.set(eventName, node.next);
-                } else {
-                    listeners.delete(eventName);
-                }
-                return
-            }
-
-            prev = node;
-            node = node.next;
-        }
-    },
-
-    /**
-     * Dispatch a given event.
-     * @param {Event|{type:string}} event The event to dispatch.
-     * @returns {boolean} `false` if canceled.
-     */
-    dispatchEvent(event) {
-        if (event == null || typeof event.type !== "string") {
-            throw new TypeError('"event.type" should be a string.')
-        }
-
-        // If listeners aren't registered, terminate.
-        const listeners = getListeners(this);
-        const eventName = event.type;
-        let node = listeners.get(eventName);
-        if (node == null) {
-            return true
-        }
-
-        // Since we cannot rewrite several properties, so wrap object.
-        const wrappedEvent = wrapEvent(this, event);
-
-        // This doesn't process capturing phase and bubbling phase.
-        // This isn't participating in a tree.
-        let prev = null;
-        while (node != null) {
-            // Remove this listener if it's once
-            if (node.once) {
-                if (prev !== null) {
-                    prev.next = node.next;
-                } else if (node.next !== null) {
-                    listeners.set(eventName, node.next);
-                } else {
-                    listeners.delete(eventName);
-                }
-            } else {
-                prev = node;
-            }
-
-            // Call this listener
-            setPassiveListener(
-                wrappedEvent,
-                node.passive ? node.listener : null
-            );
-            if (typeof node.listener === "function") {
-                try {
-                    node.listener.call(this, wrappedEvent);
-                } catch (err) {
-                    if (
-                        typeof console !== "undefined" &&
-                        typeof console.error === "function"
-                    ) {
-                        console.error(err);
-                    }
-                }
-            } else if (
-                node.listenerType !== ATTRIBUTE &&
-                typeof node.listener.handleEvent === "function"
-            ) {
-                node.listener.handleEvent(wrappedEvent);
-            }
-
-            // Break if `event.stopImmediatePropagation` was called.
-            if (isStopped(wrappedEvent)) {
-                break
-            }
-
-            node = node.next;
-        }
-        setPassiveListener(wrappedEvent, null);
-        setEventPhase(wrappedEvent, 0);
-        setCurrentTarget(wrappedEvent, null);
-
-        return !wrappedEvent.defaultPrevented
-    },
-};
-
-// `constructor` is not enumerable.
-Object.defineProperty(EventTarget.prototype, "constructor", {
-    value: EventTarget,
-    configurable: true,
-    writable: true,
-});
-
-// Ensure `eventTarget instanceof window.EventTarget` is `true`.
-if (
-    typeof window !== "undefined" &&
-    typeof window.EventTarget !== "undefined"
-) {
-    Object.setPrototypeOf(EventTarget.prototype, window.EventTarget.prototype);
-}
-
-exports.defineEventAttribute = defineEventAttribute;
-exports.EventTarget = EventTarget;
-exports.default = EventTarget;
-
-module.exports = EventTarget
-module.exports.EventTarget = module.exports.default = EventTarget
-module.exports.defineEventAttribute = defineEventAttribute
-//# sourceMappingURL=event-target-shim.js.map
-
 
 /***/ }),
 
@@ -4812,6 +4642,672 @@ if (true) {
 
 /***/ }),
 
+/***/ 1133:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var debug;
+
+module.exports = function () {
+  if (!debug) {
+    try {
+      /* eslint global-require: off */
+      debug = __nccwpck_require__(8237)("follow-redirects");
+    }
+    catch (error) { /* */ }
+    if (typeof debug !== "function") {
+      debug = function () { /* */ };
+    }
+  }
+  debug.apply(null, arguments);
+};
+
+
+/***/ }),
+
+/***/ 7707:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var url = __nccwpck_require__(8835);
+var URL = url.URL;
+var http = __nccwpck_require__(8605);
+var https = __nccwpck_require__(7211);
+var Writable = __nccwpck_require__(2413).Writable;
+var assert = __nccwpck_require__(2357);
+var debug = __nccwpck_require__(1133);
+
+// Create handlers that pass events from native requests
+var events = ["abort", "aborted", "connect", "error", "socket", "timeout"];
+var eventHandlers = Object.create(null);
+events.forEach(function (event) {
+  eventHandlers[event] = function (arg1, arg2, arg3) {
+    this._redirectable.emit(event, arg1, arg2, arg3);
+  };
+});
+
+var InvalidUrlError = createErrorType(
+  "ERR_INVALID_URL",
+  "Invalid URL",
+  TypeError
+);
+// Error types with codes
+var RedirectionError = createErrorType(
+  "ERR_FR_REDIRECTION_FAILURE",
+  "Redirected request failed"
+);
+var TooManyRedirectsError = createErrorType(
+  "ERR_FR_TOO_MANY_REDIRECTS",
+  "Maximum number of redirects exceeded"
+);
+var MaxBodyLengthExceededError = createErrorType(
+  "ERR_FR_MAX_BODY_LENGTH_EXCEEDED",
+  "Request body larger than maxBodyLength limit"
+);
+var WriteAfterEndError = createErrorType(
+  "ERR_STREAM_WRITE_AFTER_END",
+  "write after end"
+);
+
+// An HTTP(S) request that can be redirected
+function RedirectableRequest(options, responseCallback) {
+  // Initialize the request
+  Writable.call(this);
+  this._sanitizeOptions(options);
+  this._options = options;
+  this._ended = false;
+  this._ending = false;
+  this._redirectCount = 0;
+  this._redirects = [];
+  this._requestBodyLength = 0;
+  this._requestBodyBuffers = [];
+
+  // Attach a callback if passed
+  if (responseCallback) {
+    this.on("response", responseCallback);
+  }
+
+  // React to responses of native requests
+  var self = this;
+  this._onNativeResponse = function (response) {
+    self._processResponse(response);
+  };
+
+  // Perform the first request
+  this._performRequest();
+}
+RedirectableRequest.prototype = Object.create(Writable.prototype);
+
+RedirectableRequest.prototype.abort = function () {
+  abortRequest(this._currentRequest);
+  this.emit("abort");
+};
+
+// Writes buffered data to the current native request
+RedirectableRequest.prototype.write = function (data, encoding, callback) {
+  // Writing is not allowed if end has been called
+  if (this._ending) {
+    throw new WriteAfterEndError();
+  }
+
+  // Validate input and shift parameters if necessary
+  if (!isString(data) && !isBuffer(data)) {
+    throw new TypeError("data should be a string, Buffer or Uint8Array");
+  }
+  if (isFunction(encoding)) {
+    callback = encoding;
+    encoding = null;
+  }
+
+  // Ignore empty buffers, since writing them doesn't invoke the callback
+  // https://github.com/nodejs/node/issues/22066
+  if (data.length === 0) {
+    if (callback) {
+      callback();
+    }
+    return;
+  }
+  // Only write when we don't exceed the maximum body length
+  if (this._requestBodyLength + data.length <= this._options.maxBodyLength) {
+    this._requestBodyLength += data.length;
+    this._requestBodyBuffers.push({ data: data, encoding: encoding });
+    this._currentRequest.write(data, encoding, callback);
+  }
+  // Error when we exceed the maximum body length
+  else {
+    this.emit("error", new MaxBodyLengthExceededError());
+    this.abort();
+  }
+};
+
+// Ends the current native request
+RedirectableRequest.prototype.end = function (data, encoding, callback) {
+  // Shift parameters if necessary
+  if (isFunction(data)) {
+    callback = data;
+    data = encoding = null;
+  }
+  else if (isFunction(encoding)) {
+    callback = encoding;
+    encoding = null;
+  }
+
+  // Write data if needed and end
+  if (!data) {
+    this._ended = this._ending = true;
+    this._currentRequest.end(null, null, callback);
+  }
+  else {
+    var self = this;
+    var currentRequest = this._currentRequest;
+    this.write(data, encoding, function () {
+      self._ended = true;
+      currentRequest.end(null, null, callback);
+    });
+    this._ending = true;
+  }
+};
+
+// Sets a header value on the current native request
+RedirectableRequest.prototype.setHeader = function (name, value) {
+  this._options.headers[name] = value;
+  this._currentRequest.setHeader(name, value);
+};
+
+// Clears a header value on the current native request
+RedirectableRequest.prototype.removeHeader = function (name) {
+  delete this._options.headers[name];
+  this._currentRequest.removeHeader(name);
+};
+
+// Global timeout for all underlying requests
+RedirectableRequest.prototype.setTimeout = function (msecs, callback) {
+  var self = this;
+
+  // Destroys the socket on timeout
+  function destroyOnTimeout(socket) {
+    socket.setTimeout(msecs);
+    socket.removeListener("timeout", socket.destroy);
+    socket.addListener("timeout", socket.destroy);
+  }
+
+  // Sets up a timer to trigger a timeout event
+  function startTimer(socket) {
+    if (self._timeout) {
+      clearTimeout(self._timeout);
+    }
+    self._timeout = setTimeout(function () {
+      self.emit("timeout");
+      clearTimer();
+    }, msecs);
+    destroyOnTimeout(socket);
+  }
+
+  // Stops a timeout from triggering
+  function clearTimer() {
+    // Clear the timeout
+    if (self._timeout) {
+      clearTimeout(self._timeout);
+      self._timeout = null;
+    }
+
+    // Clean up all attached listeners
+    self.removeListener("abort", clearTimer);
+    self.removeListener("error", clearTimer);
+    self.removeListener("response", clearTimer);
+    if (callback) {
+      self.removeListener("timeout", callback);
+    }
+    if (!self.socket) {
+      self._currentRequest.removeListener("socket", startTimer);
+    }
+  }
+
+  // Attach callback if passed
+  if (callback) {
+    this.on("timeout", callback);
+  }
+
+  // Start the timer if or when the socket is opened
+  if (this.socket) {
+    startTimer(this.socket);
+  }
+  else {
+    this._currentRequest.once("socket", startTimer);
+  }
+
+  // Clean up on events
+  this.on("socket", destroyOnTimeout);
+  this.on("abort", clearTimer);
+  this.on("error", clearTimer);
+  this.on("response", clearTimer);
+
+  return this;
+};
+
+// Proxy all other public ClientRequest methods
+[
+  "flushHeaders", "getHeader",
+  "setNoDelay", "setSocketKeepAlive",
+].forEach(function (method) {
+  RedirectableRequest.prototype[method] = function (a, b) {
+    return this._currentRequest[method](a, b);
+  };
+});
+
+// Proxy all public ClientRequest properties
+["aborted", "connection", "socket"].forEach(function (property) {
+  Object.defineProperty(RedirectableRequest.prototype, property, {
+    get: function () { return this._currentRequest[property]; },
+  });
+});
+
+RedirectableRequest.prototype._sanitizeOptions = function (options) {
+  // Ensure headers are always present
+  if (!options.headers) {
+    options.headers = {};
+  }
+
+  // Since http.request treats host as an alias of hostname,
+  // but the url module interprets host as hostname plus port,
+  // eliminate the host property to avoid confusion.
+  if (options.host) {
+    // Use hostname if set, because it has precedence
+    if (!options.hostname) {
+      options.hostname = options.host;
+    }
+    delete options.host;
+  }
+
+  // Complete the URL object when necessary
+  if (!options.pathname && options.path) {
+    var searchPos = options.path.indexOf("?");
+    if (searchPos < 0) {
+      options.pathname = options.path;
+    }
+    else {
+      options.pathname = options.path.substring(0, searchPos);
+      options.search = options.path.substring(searchPos);
+    }
+  }
+};
+
+
+// Executes the next native request (initial or redirect)
+RedirectableRequest.prototype._performRequest = function () {
+  // Load the native protocol
+  var protocol = this._options.protocol;
+  var nativeProtocol = this._options.nativeProtocols[protocol];
+  if (!nativeProtocol) {
+    this.emit("error", new TypeError("Unsupported protocol " + protocol));
+    return;
+  }
+
+  // If specified, use the agent corresponding to the protocol
+  // (HTTP and HTTPS use different types of agents)
+  if (this._options.agents) {
+    var scheme = protocol.slice(0, -1);
+    this._options.agent = this._options.agents[scheme];
+  }
+
+  // Create the native request and set up its event handlers
+  var request = this._currentRequest =
+        nativeProtocol.request(this._options, this._onNativeResponse);
+  request._redirectable = this;
+  for (var event of events) {
+    request.on(event, eventHandlers[event]);
+  }
+
+  // RFC7230§5.3.1: When making a request directly to an origin server, […]
+  // a client MUST send only the absolute path […] as the request-target.
+  this._currentUrl = /^\//.test(this._options.path) ?
+    url.format(this._options) :
+    // When making a request to a proxy, […]
+    // a client MUST send the target URI in absolute-form […].
+    this._options.path;
+
+  // End a redirected request
+  // (The first request must be ended explicitly with RedirectableRequest#end)
+  if (this._isRedirect) {
+    // Write the request entity and end
+    var i = 0;
+    var self = this;
+    var buffers = this._requestBodyBuffers;
+    (function writeNext(error) {
+      // Only write if this request has not been redirected yet
+      /* istanbul ignore else */
+      if (request === self._currentRequest) {
+        // Report any write errors
+        /* istanbul ignore if */
+        if (error) {
+          self.emit("error", error);
+        }
+        // Write the next buffer if there are still left
+        else if (i < buffers.length) {
+          var buffer = buffers[i++];
+          /* istanbul ignore else */
+          if (!request.finished) {
+            request.write(buffer.data, buffer.encoding, writeNext);
+          }
+        }
+        // End the request if `end` has been called on us
+        else if (self._ended) {
+          request.end();
+        }
+      }
+    }());
+  }
+};
+
+// Processes a response from the current native request
+RedirectableRequest.prototype._processResponse = function (response) {
+  // Store the redirected response
+  var statusCode = response.statusCode;
+  if (this._options.trackRedirects) {
+    this._redirects.push({
+      url: this._currentUrl,
+      headers: response.headers,
+      statusCode: statusCode,
+    });
+  }
+
+  // RFC7231§6.4: The 3xx (Redirection) class of status code indicates
+  // that further action needs to be taken by the user agent in order to
+  // fulfill the request. If a Location header field is provided,
+  // the user agent MAY automatically redirect its request to the URI
+  // referenced by the Location field value,
+  // even if the specific status code is not understood.
+
+  // If the response is not a redirect; return it as-is
+  var location = response.headers.location;
+  if (!location || this._options.followRedirects === false ||
+      statusCode < 300 || statusCode >= 400) {
+    response.responseUrl = this._currentUrl;
+    response.redirects = this._redirects;
+    this.emit("response", response);
+
+    // Clean up
+    this._requestBodyBuffers = [];
+    return;
+  }
+
+  // The response is a redirect, so abort the current request
+  abortRequest(this._currentRequest);
+  // Discard the remainder of the response to avoid waiting for data
+  response.destroy();
+
+  // RFC7231§6.4: A client SHOULD detect and intervene
+  // in cyclical redirections (i.e., "infinite" redirection loops).
+  if (++this._redirectCount > this._options.maxRedirects) {
+    this.emit("error", new TooManyRedirectsError());
+    return;
+  }
+
+  // Store the request headers if applicable
+  var requestHeaders;
+  var beforeRedirect = this._options.beforeRedirect;
+  if (beforeRedirect) {
+    requestHeaders = Object.assign({
+      // The Host header was set by nativeProtocol.request
+      Host: response.req.getHeader("host"),
+    }, this._options.headers);
+  }
+
+  // RFC7231§6.4: Automatic redirection needs to done with
+  // care for methods not known to be safe, […]
+  // RFC7231§6.4.2–3: For historical reasons, a user agent MAY change
+  // the request method from POST to GET for the subsequent request.
+  var method = this._options.method;
+  if ((statusCode === 301 || statusCode === 302) && this._options.method === "POST" ||
+      // RFC7231§6.4.4: The 303 (See Other) status code indicates that
+      // the server is redirecting the user agent to a different resource […]
+      // A user agent can perform a retrieval request targeting that URI
+      // (a GET or HEAD request if using HTTP) […]
+      (statusCode === 303) && !/^(?:GET|HEAD)$/.test(this._options.method)) {
+    this._options.method = "GET";
+    // Drop a possible entity and headers related to it
+    this._requestBodyBuffers = [];
+    removeMatchingHeaders(/^content-/i, this._options.headers);
+  }
+
+  // Drop the Host header, as the redirect might lead to a different host
+  var currentHostHeader = removeMatchingHeaders(/^host$/i, this._options.headers);
+
+  // If the redirect is relative, carry over the host of the last request
+  var currentUrlParts = url.parse(this._currentUrl);
+  var currentHost = currentHostHeader || currentUrlParts.host;
+  var currentUrl = /^\w+:/.test(location) ? this._currentUrl :
+    url.format(Object.assign(currentUrlParts, { host: currentHost }));
+
+  // Determine the URL of the redirection
+  var redirectUrl;
+  try {
+    redirectUrl = url.resolve(currentUrl, location);
+  }
+  catch (cause) {
+    this.emit("error", new RedirectionError({ cause: cause }));
+    return;
+  }
+
+  // Create the redirected request
+  debug("redirecting to", redirectUrl);
+  this._isRedirect = true;
+  var redirectUrlParts = url.parse(redirectUrl);
+  Object.assign(this._options, redirectUrlParts);
+
+  // Drop confidential headers when redirecting to a less secure protocol
+  // or to a different domain that is not a superdomain
+  if (redirectUrlParts.protocol !== currentUrlParts.protocol &&
+     redirectUrlParts.protocol !== "https:" ||
+     redirectUrlParts.host !== currentHost &&
+     !isSubdomain(redirectUrlParts.host, currentHost)) {
+    removeMatchingHeaders(/^(?:authorization|cookie)$/i, this._options.headers);
+  }
+
+  // Evaluate the beforeRedirect callback
+  if (isFunction(beforeRedirect)) {
+    var responseDetails = {
+      headers: response.headers,
+      statusCode: statusCode,
+    };
+    var requestDetails = {
+      url: currentUrl,
+      method: method,
+      headers: requestHeaders,
+    };
+    try {
+      beforeRedirect(this._options, responseDetails, requestDetails);
+    }
+    catch (err) {
+      this.emit("error", err);
+      return;
+    }
+    this._sanitizeOptions(this._options);
+  }
+
+  // Perform the redirected request
+  try {
+    this._performRequest();
+  }
+  catch (cause) {
+    this.emit("error", new RedirectionError({ cause: cause }));
+  }
+};
+
+// Wraps the key/value object of protocols with redirect functionality
+function wrap(protocols) {
+  // Default settings
+  var exports = {
+    maxRedirects: 21,
+    maxBodyLength: 10 * 1024 * 1024,
+  };
+
+  // Wrap each protocol
+  var nativeProtocols = {};
+  Object.keys(protocols).forEach(function (scheme) {
+    var protocol = scheme + ":";
+    var nativeProtocol = nativeProtocols[protocol] = protocols[scheme];
+    var wrappedProtocol = exports[scheme] = Object.create(nativeProtocol);
+
+    // Executes a request, following redirects
+    function request(input, options, callback) {
+      // Parse parameters
+      if (isString(input)) {
+        var parsed;
+        try {
+          parsed = urlToOptions(new URL(input));
+        }
+        catch (err) {
+          /* istanbul ignore next */
+          parsed = url.parse(input);
+        }
+        if (!isString(parsed.protocol)) {
+          throw new InvalidUrlError({ input });
+        }
+        input = parsed;
+      }
+      else if (URL && (input instanceof URL)) {
+        input = urlToOptions(input);
+      }
+      else {
+        callback = options;
+        options = input;
+        input = { protocol: protocol };
+      }
+      if (isFunction(options)) {
+        callback = options;
+        options = null;
+      }
+
+      // Set defaults
+      options = Object.assign({
+        maxRedirects: exports.maxRedirects,
+        maxBodyLength: exports.maxBodyLength,
+      }, input, options);
+      options.nativeProtocols = nativeProtocols;
+      if (!isString(options.host) && !isString(options.hostname)) {
+        options.hostname = "::1";
+      }
+
+      assert.equal(options.protocol, protocol, "protocol mismatch");
+      debug("options", options);
+      return new RedirectableRequest(options, callback);
+    }
+
+    // Executes a GET request, following redirects
+    function get(input, options, callback) {
+      var wrappedRequest = wrappedProtocol.request(input, options, callback);
+      wrappedRequest.end();
+      return wrappedRequest;
+    }
+
+    // Expose the properties on the wrapped protocol
+    Object.defineProperties(wrappedProtocol, {
+      request: { value: request, configurable: true, enumerable: true, writable: true },
+      get: { value: get, configurable: true, enumerable: true, writable: true },
+    });
+  });
+  return exports;
+}
+
+/* istanbul ignore next */
+function noop() { /* empty */ }
+
+// from https://github.com/nodejs/node/blob/master/lib/internal/url.js
+function urlToOptions(urlObject) {
+  var options = {
+    protocol: urlObject.protocol,
+    hostname: urlObject.hostname.startsWith("[") ?
+      /* istanbul ignore next */
+      urlObject.hostname.slice(1, -1) :
+      urlObject.hostname,
+    hash: urlObject.hash,
+    search: urlObject.search,
+    pathname: urlObject.pathname,
+    path: urlObject.pathname + urlObject.search,
+    href: urlObject.href,
+  };
+  if (urlObject.port !== "") {
+    options.port = Number(urlObject.port);
+  }
+  return options;
+}
+
+function removeMatchingHeaders(regex, headers) {
+  var lastValue;
+  for (var header in headers) {
+    if (regex.test(header)) {
+      lastValue = headers[header];
+      delete headers[header];
+    }
+  }
+  return (lastValue === null || typeof lastValue === "undefined") ?
+    undefined : String(lastValue).trim();
+}
+
+function createErrorType(code, message, baseClass) {
+  // Create constructor
+  function CustomError(properties) {
+    Error.captureStackTrace(this, this.constructor);
+    Object.assign(this, properties || {});
+    this.code = code;
+    this.message = this.cause ? message + ": " + this.cause.message : message;
+  }
+
+  // Attach constructor and set default properties
+  CustomError.prototype = new (baseClass || Error)();
+  CustomError.prototype.constructor = CustomError;
+  CustomError.prototype.name = "Error [" + code + "]";
+  return CustomError;
+}
+
+function abortRequest(request) {
+  for (var event of events) {
+    request.removeListener(event, eventHandlers[event]);
+  }
+  request.on("error", noop);
+  request.abort();
+}
+
+function isSubdomain(subdomain, domain) {
+  assert(isString(subdomain) && isString(domain));
+  var dot = subdomain.length - domain.length - 1;
+  return dot > 0 && subdomain[dot] === "." && subdomain.endsWith(domain);
+}
+
+function isString(value) {
+  return typeof value === "string" || value instanceof String;
+}
+
+function isFunction(value) {
+  return typeof value === "function";
+}
+
+function isBuffer(value) {
+  return typeof value === "object" && ("length" in value);
+}
+
+// Exports
+module.exports = wrap({ http: http, https: https });
+module.exports.wrap = wrap;
+
+
+/***/ }),
+
+/***/ 1621:
+/***/ ((module) => {
+
+"use strict";
+
+
+module.exports = (flag, argv = process.argv) => {
+	const prefix = flag.startsWith('-') ? '' : (flag.length === 1 ? '-' : '--');
+	const position = argv.indexOf(prefix + flag);
+	const terminatorPosition = argv.indexOf('--');
+	return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
+};
+
+
+/***/ }),
+
 /***/ 3657:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -4827,6 +5323,521 @@ function headerCase(input, options) {
 }
 exports.headerCase = headerCase;
 //# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 6612:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+global.FormData = module.exports = __nccwpck_require__(2650)
+
+
+/***/ }),
+
+/***/ 2650:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+var CombinedStream = __nccwpck_require__(5443);
+var util = __nccwpck_require__(1669);
+var path = __nccwpck_require__(5622);
+var http = __nccwpck_require__(8605);
+var https = __nccwpck_require__(7211);
+var parseUrl = __nccwpck_require__(8835).parse;
+var fs = __nccwpck_require__(5747);
+var mime = __nccwpck_require__(3583);
+var asynckit = __nccwpck_require__(4812);
+var populate = __nccwpck_require__(4523);
+
+// Public API
+module.exports = FormData;
+
+// make it a Stream
+util.inherits(FormData, CombinedStream);
+
+/**
+ * Create readable "multipart/form-data" streams.
+ * Can be used to submit forms
+ * and file uploads to other web applications.
+ *
+ * @constructor
+ * @param {Object} options - Properties to be added/overriden for FormData and CombinedStream
+ */
+function FormData(options) {
+  if (!(this instanceof FormData)) {
+    return new FormData();
+  }
+
+  this._overheadLength = 0;
+  this._valueLength = 0;
+  this._valuesToMeasure = [];
+
+  CombinedStream.call(this);
+
+  options = options || {};
+  for (var option in options) {
+    this[option] = options[option];
+  }
+}
+
+FormData.LINE_BREAK = '\r\n';
+FormData.DEFAULT_CONTENT_TYPE = 'application/octet-stream';
+
+FormData.prototype.append = function(field, value, options) {
+
+  options = options || {};
+
+  // allow filename as single option
+  if (typeof options == 'string') {
+    options = {filename: options};
+  }
+
+  var append = CombinedStream.prototype.append.bind(this);
+
+  // all that streamy business can't handle numbers
+  if (typeof value == 'number') {
+    value = '' + value;
+  }
+
+  // https://github.com/felixge/node-form-data/issues/38
+  if (util.isArray(value)) {
+    // Please convert your array into string
+    // the way web server expects it
+    this._error(new Error('Arrays are not supported.'));
+    return;
+  }
+
+  var header = this._multiPartHeader(field, value, options);
+  var footer = this._multiPartFooter();
+
+  append(header);
+  append(value);
+  append(footer);
+
+  // pass along options.knownLength
+  this._trackLength(header, value, options);
+};
+
+FormData.prototype._trackLength = function(header, value, options) {
+  var valueLength = 0;
+
+  // used w/ getLengthSync(), when length is known.
+  // e.g. for streaming directly from a remote server,
+  // w/ a known file a size, and not wanting to wait for
+  // incoming file to finish to get its size.
+  if (options.knownLength != null) {
+    valueLength += +options.knownLength;
+  } else if (Buffer.isBuffer(value)) {
+    valueLength = value.length;
+  } else if (typeof value === 'string') {
+    valueLength = Buffer.byteLength(value);
+  }
+
+  this._valueLength += valueLength;
+
+  // @check why add CRLF? does this account for custom/multiple CRLFs?
+  this._overheadLength +=
+    Buffer.byteLength(header) +
+    FormData.LINE_BREAK.length;
+
+  // empty or either doesn't have path or not an http response
+  if (!value || ( !value.path && !(value.readable && value.hasOwnProperty('httpVersion')) )) {
+    return;
+  }
+
+  // no need to bother with the length
+  if (!options.knownLength) {
+    this._valuesToMeasure.push(value);
+  }
+};
+
+FormData.prototype._lengthRetriever = function(value, callback) {
+
+  if (value.hasOwnProperty('fd')) {
+
+    // take read range into a account
+    // `end` = Infinity –> read file till the end
+    //
+    // TODO: Looks like there is bug in Node fs.createReadStream
+    // it doesn't respect `end` options without `start` options
+    // Fix it when node fixes it.
+    // https://github.com/joyent/node/issues/7819
+    if (value.end != undefined && value.end != Infinity && value.start != undefined) {
+
+      // when end specified
+      // no need to calculate range
+      // inclusive, starts with 0
+      callback(null, value.end + 1 - (value.start ? value.start : 0));
+
+    // not that fast snoopy
+    } else {
+      // still need to fetch file size from fs
+      fs.stat(value.path, function(err, stat) {
+
+        var fileSize;
+
+        if (err) {
+          callback(err);
+          return;
+        }
+
+        // update final size based on the range options
+        fileSize = stat.size - (value.start ? value.start : 0);
+        callback(null, fileSize);
+      });
+    }
+
+  // or http response
+  } else if (value.hasOwnProperty('httpVersion')) {
+    callback(null, +value.headers['content-length']);
+
+  // or request stream http://github.com/mikeal/request
+  } else if (value.hasOwnProperty('httpModule')) {
+    // wait till response come back
+    value.on('response', function(response) {
+      value.pause();
+      callback(null, +response.headers['content-length']);
+    });
+    value.resume();
+
+  // something else
+  } else {
+    callback('Unknown stream');
+  }
+};
+
+FormData.prototype._multiPartHeader = function(field, value, options) {
+  // custom header specified (as string)?
+  // it becomes responsible for boundary
+  // (e.g. to handle extra CRLFs on .NET servers)
+  if (typeof options.header == 'string') {
+    return options.header;
+  }
+
+  var contentDisposition = this._getContentDisposition(value, options);
+  var contentType = this._getContentType(value, options);
+
+  var contents = '';
+  var headers  = {
+    // add custom disposition as third element or keep it two elements if not
+    'Content-Disposition': ['form-data', 'name="' + field + '"'].concat(contentDisposition || []),
+    // if no content type. allow it to be empty array
+    'Content-Type': [].concat(contentType || [])
+  };
+
+  // allow custom headers.
+  if (typeof options.header == 'object') {
+    populate(headers, options.header);
+  }
+
+  var header;
+  for (var prop in headers) {
+    if (!headers.hasOwnProperty(prop)) continue;
+    header = headers[prop];
+
+    // skip nullish headers.
+    if (header == null) {
+      continue;
+    }
+
+    // convert all headers to arrays.
+    if (!Array.isArray(header)) {
+      header = [header];
+    }
+
+    // add non-empty headers.
+    if (header.length) {
+      contents += prop + ': ' + header.join('; ') + FormData.LINE_BREAK;
+    }
+  }
+
+  return '--' + this.getBoundary() + FormData.LINE_BREAK + contents + FormData.LINE_BREAK;
+};
+
+FormData.prototype._getContentDisposition = function(value, options) {
+
+  var filename
+    , contentDisposition
+    ;
+
+  if (typeof options.filepath === 'string') {
+    // custom filepath for relative paths
+    filename = path.normalize(options.filepath).replace(/\\/g, '/');
+  } else if (options.filename || value.name || value.path) {
+    // custom filename take precedence
+    // formidable and the browser add a name property
+    // fs- and request- streams have path property
+    filename = path.basename(options.filename || value.name || value.path);
+  } else if (value.readable && value.hasOwnProperty('httpVersion')) {
+    // or try http response
+    filename = path.basename(value.client._httpMessage.path || '');
+  }
+
+  if (filename) {
+    contentDisposition = 'filename="' + filename + '"';
+  }
+
+  return contentDisposition;
+};
+
+FormData.prototype._getContentType = function(value, options) {
+
+  // use custom content-type above all
+  var contentType = options.contentType;
+
+  // or try `name` from formidable, browser
+  if (!contentType && value.name) {
+    contentType = mime.lookup(value.name);
+  }
+
+  // or try `path` from fs-, request- streams
+  if (!contentType && value.path) {
+    contentType = mime.lookup(value.path);
+  }
+
+  // or if it's http-reponse
+  if (!contentType && value.readable && value.hasOwnProperty('httpVersion')) {
+    contentType = value.headers['content-type'];
+  }
+
+  // or guess it from the filepath or filename
+  if (!contentType && (options.filepath || options.filename)) {
+    contentType = mime.lookup(options.filepath || options.filename);
+  }
+
+  // fallback to the default content type if `value` is not simple value
+  if (!contentType && typeof value == 'object') {
+    contentType = FormData.DEFAULT_CONTENT_TYPE;
+  }
+
+  return contentType;
+};
+
+FormData.prototype._multiPartFooter = function() {
+  return function(next) {
+    var footer = FormData.LINE_BREAK;
+
+    var lastPart = (this._streams.length === 0);
+    if (lastPart) {
+      footer += this._lastBoundary();
+    }
+
+    next(footer);
+  }.bind(this);
+};
+
+FormData.prototype._lastBoundary = function() {
+  return '--' + this.getBoundary() + '--' + FormData.LINE_BREAK;
+};
+
+FormData.prototype.getHeaders = function(userHeaders) {
+  var header;
+  var formHeaders = {
+    'content-type': 'multipart/form-data; boundary=' + this.getBoundary()
+  };
+
+  for (header in userHeaders) {
+    if (userHeaders.hasOwnProperty(header)) {
+      formHeaders[header.toLowerCase()] = userHeaders[header];
+    }
+  }
+
+  return formHeaders;
+};
+
+FormData.prototype.getBoundary = function() {
+  if (!this._boundary) {
+    this._generateBoundary();
+  }
+
+  return this._boundary;
+};
+
+FormData.prototype.getBuffer = function() {
+  var dataBuffer = new Buffer.alloc( 0 );
+  var boundary = this.getBoundary();
+
+  // Create the form content. Add Line breaks to the end of data.
+  for (var i = 0, len = this._streams.length; i < len; i++) {
+    if (typeof this._streams[i] !== 'function') {
+
+      // Add content to the buffer.
+      if(Buffer.isBuffer(this._streams[i])) {
+        dataBuffer = Buffer.concat( [dataBuffer, this._streams[i]]);
+      }else {
+        dataBuffer = Buffer.concat( [dataBuffer, Buffer.from(this._streams[i])]);
+      }
+
+      // Add break after content.
+      if (typeof this._streams[i] !== 'string' || this._streams[i].substring( 2, boundary.length + 2 ) !== boundary) {
+        dataBuffer = Buffer.concat( [dataBuffer, Buffer.from(FormData.LINE_BREAK)] );
+      }
+    }
+  }
+
+  // Add the footer and return the Buffer object.
+  return Buffer.concat( [dataBuffer, Buffer.from(this._lastBoundary())] );
+};
+
+FormData.prototype._generateBoundary = function() {
+  // This generates a 50 character boundary similar to those used by Firefox.
+  // They are optimized for boyer-moore parsing.
+  var boundary = '--------------------------';
+  for (var i = 0; i < 24; i++) {
+    boundary += Math.floor(Math.random() * 10).toString(16);
+  }
+
+  this._boundary = boundary;
+};
+
+// Note: getLengthSync DOESN'T calculate streams length
+// As workaround one can calculate file size manually
+// and add it as knownLength option
+FormData.prototype.getLengthSync = function() {
+  var knownLength = this._overheadLength + this._valueLength;
+
+  // Don't get confused, there are 3 "internal" streams for each keyval pair
+  // so it basically checks if there is any value added to the form
+  if (this._streams.length) {
+    knownLength += this._lastBoundary().length;
+  }
+
+  // https://github.com/form-data/form-data/issues/40
+  if (!this.hasKnownLength()) {
+    // Some async length retrievers are present
+    // therefore synchronous length calculation is false.
+    // Please use getLength(callback) to get proper length
+    this._error(new Error('Cannot calculate proper length in synchronous way.'));
+  }
+
+  return knownLength;
+};
+
+// Public API to check if length of added values is known
+// https://github.com/form-data/form-data/issues/196
+// https://github.com/form-data/form-data/issues/262
+FormData.prototype.hasKnownLength = function() {
+  var hasKnownLength = true;
+
+  if (this._valuesToMeasure.length) {
+    hasKnownLength = false;
+  }
+
+  return hasKnownLength;
+};
+
+FormData.prototype.getLength = function(cb) {
+  var knownLength = this._overheadLength + this._valueLength;
+
+  if (this._streams.length) {
+    knownLength += this._lastBoundary().length;
+  }
+
+  if (!this._valuesToMeasure.length) {
+    process.nextTick(cb.bind(this, null, knownLength));
+    return;
+  }
+
+  asynckit.parallel(this._valuesToMeasure, this._lengthRetriever, function(err, values) {
+    if (err) {
+      cb(err);
+      return;
+    }
+
+    values.forEach(function(length) {
+      knownLength += length;
+    });
+
+    cb(null, knownLength);
+  });
+};
+
+FormData.prototype.submit = function(params, cb) {
+  var request
+    , options
+    , defaults = {method: 'post'}
+    ;
+
+  // parse provided url if it's string
+  // or treat it as options object
+  if (typeof params == 'string') {
+
+    params = parseUrl(params);
+    options = populate({
+      port: params.port,
+      path: params.pathname,
+      host: params.hostname,
+      protocol: params.protocol
+    }, defaults);
+
+  // use custom params
+  } else {
+
+    options = populate(params, defaults);
+    // if no port provided use default one
+    if (!options.port) {
+      options.port = options.protocol == 'https:' ? 443 : 80;
+    }
+  }
+
+  // put that good code in getHeaders to some use
+  options.headers = this.getHeaders(params.headers);
+
+  // https if specified, fallback to http in any other case
+  if (options.protocol == 'https:') {
+    request = https.request(options);
+  } else {
+    request = http.request(options);
+  }
+
+  // get content length and fire away
+  this.getLength(function(err, length) {
+    if (err) {
+      this._error(err);
+      return;
+    }
+
+    // add content length
+    request.setHeader('Content-Length', length);
+
+    this.pipe(request);
+    if (cb) {
+      request.on('error', cb);
+      request.on('response', cb.bind(this, null));
+    }
+  }.bind(this));
+
+  return request;
+};
+
+FormData.prototype._error = function(err) {
+  if (!this.error) {
+    this.error = err;
+    this.pause();
+    this.emit('error', err);
+  }
+};
+
+FormData.prototype.toString = function () {
+  return '[object FormData]';
+};
+
+
+/***/ }),
+
+/***/ 4523:
+/***/ ((module) => {
+
+// populates missing values
+module.exports = function(dst, src) {
+
+  Object.keys(src).forEach(function(prop)
+  {
+    dst[prop] = dst[prop] || src[prop];
+  });
+
+  return dst;
+};
+
 
 /***/ }),
 
@@ -4897,6 +5908,3713 @@ function lowerCase(str) {
 }
 exports.lowerCase = lowerCase;
 //# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 880:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+__nccwpck_require__(6612);
+var semver = __nccwpck_require__(1013);
+var axios = __nccwpck_require__(1441);
+var changeCase = __nccwpck_require__(9091);
+var EventEmitter = __nccwpck_require__(1848);
+var WebSocket = __nccwpck_require__(4713);
+
+/******************************************************************************
+Copyright (c) Microsoft Corporation.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+***************************************************************************** */
+/* global Reflect, Promise */
+
+var extendStatics = function(d, b) {
+    extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+    return extendStatics(d, b);
+};
+
+function __extends(d, b) {
+    if (typeof b !== "function" && b !== null)
+        throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+    function __() { this.constructor = d; }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+}
+
+var __assign = function() {
+    __assign = Object.assign || function __assign(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
+
+function __rest(s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+}
+
+function __decorate(decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+}
+
+function __awaiter(thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+}
+
+function __generator(thisArg, body) {
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    function verb(n) { return function (v) { return step([n, v]); }; }
+    function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [op[0] & 2, t.value];
+            switch (op[0]) {
+                case 0: case 1: t = op; break;
+                case 4: _.label++; return { value: op[1], done: false };
+                case 5: _.label++; y = op[1]; op = [0]; continue;
+                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                default:
+                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                    if (t[2]) _.ops.pop();
+                    _.trys.pop(); continue;
+            }
+            op = body.call(thisArg, _);
+        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+    }
+}
+
+function __values(o) {
+    var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
+    if (m) return m.call(o);
+    if (o && typeof o.length === "number") return {
+        next: function () {
+            if (o && i >= o.length) o = void 0;
+            return { value: o && o[i++], done: !o };
+        }
+    };
+    throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
+}
+
+function __spreadArray(to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+        if (ar || !(i in from)) {
+            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+            ar[i] = from[i];
+        }
+    }
+    return to.concat(ar || Array.prototype.slice.call(from));
+}
+
+function __await(v) {
+    return this instanceof __await ? (this.v = v, this) : new __await(v);
+}
+
+function __asyncGenerator(thisArg, _arguments, generator) {
+    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
+    var g = generator.apply(thisArg, _arguments || []), i, q = [];
+    return i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i;
+    function verb(n) { if (g[n]) i[n] = function (v) { return new Promise(function (a, b) { q.push([n, v, a, b]) > 1 || resume(n, v); }); }; }
+    function resume(n, v) { try { step(g[n](v)); } catch (e) { settle(q[0][3], e); } }
+    function step(r) { r.value instanceof __await ? Promise.resolve(r.value.v).then(fulfill, reject) : settle(q[0][2], r); }
+    function fulfill(value) { resume("next", value); }
+    function reject(value) { resume("throw", value); }
+    function settle(f, v) { if (f(v), q.shift(), q.length) resume(q[0][0], q[0][1]); }
+}
+
+function __asyncDelegator(o) {
+    var i, p;
+    return i = {}, verb("next"), verb("throw", function (e) { throw e; }), verb("return"), i[Symbol.iterator] = function () { return this; }, i;
+    function verb(n, f) { i[n] = o[n] ? function (v) { return (p = !p) ? { value: __await(o[n](v)), done: n === "return" } : f ? f(v) : v; } : f; }
+}
+
+function __asyncValues(o) {
+    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
+    var m = o[Symbol.asyncIterator], i;
+    return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
+    function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
+    function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
+}
+
+/**
+ * Error object
+ * @see https://docs.joinmastodon.org/entities/error/
+ */
+var MastoError = /** @class */ (function (_super) {
+    __extends(MastoError, _super);
+    /**
+     * @param message The error message. Equivalent for the `error` field from the Error entity
+     * @param props Additional properties
+     */
+    function MastoError(message, props) {
+        if (props === void 0) { props = {}; }
+        var _this = _super.call(this, message, { cause: props.cause }) || this;
+        _this.name = 'MastoError';
+        /** Helper to check if the error has been thrown from Masto */
+        _this.isMastoError = true;
+        _this.description = props.description;
+        _this.details = props.details;
+        return _this;
+    }
+    return MastoError;
+}(Error));
+
+var MastoHttpError = /** @class */ (function (_super) {
+    __extends(MastoHttpError, _super);
+    function MastoHttpError(message, statusCode, props) {
+        var _this = _super.call(this, message, props) || this;
+        _this.name = 'MastoHttpError';
+        _this.statusCode = statusCode;
+        return _this;
+    }
+    return MastoHttpError;
+}(MastoError));
+
+/**
+ * Mastodon forbidden error
+ */
+var MastoHttpConflictError = /** @class */ (function (_super) {
+    __extends(MastoHttpConflictError, _super);
+    function MastoHttpConflictError(message, props) {
+        var _this = _super.call(this, message, 409, props) || this;
+        _this.name = 'MastoHttpConflictError';
+        return _this;
+    }
+    return MastoHttpConflictError;
+}(MastoHttpError));
+/**
+ * @deprecated Will be removed in v5
+ */
+var MastoConflictError = MastoHttpConflictError;
+
+/**
+ * Mastodon forbidden error
+ */
+var MastoHttpForbiddenError = /** @class */ (function (_super) {
+    __extends(MastoHttpForbiddenError, _super);
+    function MastoHttpForbiddenError(message, props) {
+        var _this = _super.call(this, message, 403, props) || this;
+        _this.name = 'MastoHttpForbiddenError';
+        return _this;
+    }
+    return MastoHttpForbiddenError;
+}(MastoHttpError));
+/**
+ * @deprecated Will be removed in v5
+ */
+var MastoForbiddenError = MastoHttpForbiddenError;
+
+/**
+ * Mastodon gone error
+ */
+var MastoHttpGoneError = /** @class */ (function (_super) {
+    __extends(MastoHttpGoneError, _super);
+    function MastoHttpGoneError(message, props) {
+        var _this = _super.call(this, message, 410, props) || this;
+        _this.name = 'MastoHttpGoneError';
+        return _this;
+    }
+    return MastoHttpGoneError;
+}(MastoHttpError));
+/**
+ * @deprecated Will be removed in v5
+ */
+var MastoGoneError = MastoHttpGoneError;
+
+/**
+ * Mastodon not found error class
+ */
+var MastoHttpNotFoundError = /** @class */ (function (_super) {
+    __extends(MastoHttpNotFoundError, _super);
+    function MastoHttpNotFoundError(message, props) {
+        var _this = _super.call(this, message, 404, props) || this;
+        _this.name = 'MastoNotFoundError';
+        return _this;
+    }
+    return MastoHttpNotFoundError;
+}(MastoHttpError));
+/**
+ * @deprecated Will be removed in v5
+ */
+var MastoNotFoundError = MastoHttpNotFoundError;
+
+/**
+ * Mastodon rate limit error class
+ */
+var MastoHttpRateLimitError = /** @class */ (function (_super) {
+    __extends(MastoHttpRateLimitError, _super);
+    function MastoHttpRateLimitError(message, props) {
+        var _this = _super.call(this, message, 429, props) || this;
+        _this.name = 'MastoRateLimitError';
+        _this.limit = props === null || props === void 0 ? void 0 : props.limit;
+        _this.remaining = props === null || props === void 0 ? void 0 : props.remaining;
+        _this.reset = props === null || props === void 0 ? void 0 : props.reset;
+        return _this;
+    }
+    return MastoHttpRateLimitError;
+}(MastoHttpError));
+/**
+ * @deprecated Will be removed in v5
+ */
+var MastoRateLimitError = MastoHttpRateLimitError;
+
+/**
+ * Mastodon unauthorized error class
+ */
+var MastoHttpUnauthorizedError = /** @class */ (function (_super) {
+    __extends(MastoHttpUnauthorizedError, _super);
+    function MastoHttpUnauthorizedError(message, props) {
+        var _this = _super.call(this, message, 401, props) || this;
+        _this.name = 'MastoUnauthorizedError';
+        return _this;
+    }
+    return MastoHttpUnauthorizedError;
+}(MastoHttpError));
+/**
+ * @deprecated Will be removed in v5
+ */
+var MastoUnauthorizedError = MastoHttpUnauthorizedError;
+
+/**
+ * Mastodon unprocessable entity
+ */
+var MastoHttpUnprocessableEntityError = /** @class */ (function (_super) {
+    __extends(MastoHttpUnprocessableEntityError, _super);
+    function MastoHttpUnprocessableEntityError(message, props) {
+        var _this = _super.call(this, message, 422, props) || this;
+        _this.name = 'MastoHttpUnprocessableEntityError';
+        return _this;
+    }
+    return MastoHttpUnprocessableEntityError;
+}(MastoHttpError));
+/**
+ * @deprecated Will be removed in v5
+ */
+var MastoUnprocessableEntityError = MastoHttpUnprocessableEntityError;
+
+var createError = function (params) {
+    var _a, _b;
+    var message = (_a = params.message) !== null && _a !== void 0 ? _a : 'Unexpected error occurred';
+    var props = {
+        cause: params.cause,
+        description: (_b = params.description) !== null && _b !== void 0 ? _b : 'No further description is provided for this error',
+        details: params.details,
+    };
+    switch (params.statusCode) {
+        case 401: {
+            return new MastoHttpUnauthorizedError(message, props);
+        }
+        case 403: {
+            return new MastoHttpForbiddenError(message, props);
+        }
+        case 404: {
+            return new MastoHttpNotFoundError(message, props);
+        }
+        case 409: {
+            return new MastoHttpConflictError(message, props);
+        }
+        case 410: {
+            return new MastoHttpGoneError(message, props);
+        }
+        case 422: {
+            return new MastoHttpUnprocessableEntityError(message, props);
+        }
+        case 429: {
+            return new MastoHttpRateLimitError(message, __assign(__assign({}, props), { limit: params.limit, remaining: params.remaining, reset: params.reset }));
+        }
+        default: {
+            return new MastoHttpError(message, params.statusCode, props);
+        }
+    }
+};
+
+/**
+ * Mastodon Deserialize error
+ */
+var MastoDeserializeError = /** @class */ (function (_super) {
+    __extends(MastoDeserializeError, _super);
+    function MastoDeserializeError(message, contentType, data, props) {
+        var _this = _super.call(this, message, props) || this;
+        _this.contentType = contentType;
+        _this.data = data;
+        _this.name = 'MastoDeserializeError';
+        return _this;
+    }
+    return MastoDeserializeError;
+}(MastoError));
+
+/**
+ * Mastodon Timeout error
+ */
+var MastoTimeoutError = /** @class */ (function (_super) {
+    __extends(MastoTimeoutError, _super);
+    function MastoTimeoutError(message, props) {
+        var _this = _super.call(this, message, props) || this;
+        _this.name = 'MastoTimeoutError';
+        return _this;
+    }
+    return MastoTimeoutError;
+}(MastoError));
+
+/**
+ * Mastodon version error
+ */
+var MastoVersionError = /** @class */ (function (_super) {
+    __extends(MastoVersionError, _super);
+    function MastoVersionError(message, props) {
+        var _this = _super.call(this, message, props) || this;
+        _this.name = 'MastoVersionError';
+        return _this;
+    }
+    return MastoVersionError;
+}(MastoError));
+
+/**
+ * Decorator that verifies the version of the Mastodon instance
+ * @param parameters Optional params
+ */
+var version = function (_a) {
+    var since = _a.since, until = _a.until;
+    return function (_target, name, descriptor) {
+        var origin = descriptor.value;
+        if (!origin) {
+            throw new MastoError('version can only apply to a method of a class');
+        }
+        descriptor.value = function () {
+            var args = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                args[_i] = arguments[_i];
+            }
+            if (this.config.disableVersionCheck) {
+                return origin.apply(this, args);
+            }
+            if (since && semver.lt(this.version, since, { loose: true })) {
+                throw new MastoVersionError("".concat(String(this.constructor.name), ".").concat(String(name)) +
+                    " is not available with the current Mastodon version " +
+                    this.version +
+                    " It requires greater than or equal to version ".concat(since, "."));
+            }
+            if (until && semver.gt(this.version, until, { loose: true })) {
+                throw new MastoVersionError("".concat(String(this.constructor.name), ".").concat(String(name)) +
+                    " is not available with the current Mastodon version" +
+                    this.version +
+                    " It was removed on version ".concat(until, "."));
+            }
+            return origin.apply(this, args);
+        };
+    };
+};
+
+var Paginator = /** @class */ (function () {
+    function Paginator(http, initialUrl, initialParams) {
+        this.http = http;
+        this.initialUrl = initialUrl;
+        this.initialParams = initialParams;
+        this.pluckNext = function (link) {
+            var _a;
+            return (_a = link
+                .match(/<(.+?)>; rel="next"/)) === null || _a === void 0 ? void 0 : _a[1].replace(/^https?:\/\/[^/]+/, '');
+        };
+        this.nextUrl = initialUrl;
+        this.nextParams = initialParams;
+    }
+    Paginator.prototype.next = function (params) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function () {
+            var response;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        if (this.nextUrl == undefined) {
+                            return [2 /*return*/, { done: true, value: undefined }];
+                        }
+                        return [4 /*yield*/, this.http.request({
+                                method: 'GET',
+                                // if no params specified, use link header
+                                url: params ? this.initialUrl : this.nextUrl,
+                                params: params !== null && params !== void 0 ? params : this.nextParams,
+                            })];
+                    case 1:
+                        response = _b.sent();
+                        this.nextUrl =
+                            typeof ((_a = response.headers) === null || _a === void 0 ? void 0 : _a.link) === 'string'
+                                ? this.pluckNext(response.headers.link)
+                                : undefined;
+                        this.nextParams = {};
+                        return [2 /*return*/, {
+                                done: false,
+                                value: response.data,
+                            }];
+                }
+            });
+        });
+    };
+    Paginator.prototype.return = function (value) {
+        return __awaiter(this, void 0, void 0, function () {
+            var _a;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        _a = {
+                            done: true
+                        };
+                        return [4 /*yield*/, value];
+                    case 1: return [2 /*return*/, (_a.value = _b.sent(),
+                            _a)];
+                }
+            });
+        });
+    };
+    Paginator.prototype.throw = function (e) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                throw e;
+            });
+        });
+    };
+    Paginator.prototype[Symbol.asyncIterator] = function () {
+        return this;
+    };
+    return Paginator;
+}());
+
+var AccountRepository$1 = /** @class */ (function () {
+    function AccountRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+        /** @deprecated Use `iterateFollowers` */
+        this.getFollowersIterable = this.iterateFollowers.bind(this);
+        /** @deprecated Use `iterateFollowing` */
+        this.getFollowingIterable = this.iterateFollowing.bind(this);
+        /** @deprecated Use `iterateStatuses` */
+        this.getStatusesIterable = this.iterateStatuses.bind(this);
+    }
+    AccountRepository.prototype.iterateFollowers = function (id, params) {
+        return new Paginator(this.http, "/api/v1/accounts/".concat(id, "/followers"), params);
+    };
+    AccountRepository.prototype.iterateFollowing = function (id, params) {
+        return new Paginator(this.http, "/api/v1/accounts/".concat(id, "/following"), params);
+    };
+    AccountRepository.prototype.iterateStatuses = function (id, params) {
+        return new Paginator(this.http, "/api/v1/accounts/".concat(id, "/statuses"), params);
+    };
+    // ====
+    /**
+     * View information about a profile.
+     * @param id The id of the account in the database
+     * @return Account
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/accounts/".concat(id));
+    };
+    /**
+     * Creates a user and account records. Returns an account access token
+     * for the app that initiated the request. The app should save this token for later,
+     * and should wait for the user to confirm their account by clicking a link in their email inbox.
+     * @param params Parameters
+     * @return Token
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.create = function (params) {
+        return this.http.post("/api/v1/accounts", params);
+    };
+    /**
+     * Test to make sure that the user token works.
+     * @return the user's own Account with Source
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.verifyCredentials = function () {
+        return this.http.get('/api/v1/accounts/verify_credentials');
+    };
+    /**
+     *  Update the user's display and preferences.
+     * @param params Parameters
+     * @return the user's own Account with Source
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.updateCredentials = function (params) {
+        return this.http.patch('/api/v1/accounts/update_credentials', params, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    };
+    /**
+     * Accounts which follow the given account, if network is not hidden by the account owner.
+     * @param id The id of the account in the database
+     * @param params Parameters
+     * @return Array of Account
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.fetchFollowers = function (id, params) {
+        if (params === void 0) { params = {}; }
+        return this.iterateFollowers(id, params).next();
+    };
+    /**
+     * Accounts which the given account is following, if network is not hidden by the account owner.
+     * @param id The id of the account in the database
+     * @param params Parameters
+     * @return Array of Account
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.fetchFollowing = function (id, params) {
+        if (params === void 0) { params = {}; }
+        return this.iterateFollowing(id, params).next();
+    };
+    /**
+     * Statuses posted to the given account.
+     * @param id The id of the account in the database
+     * @param params Parameters
+     * @return Array of Status
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.fetchStatuses = function (id, params) {
+        if (params === void 0) { params = {}; }
+        return this.iterateStatuses(id, params).next();
+    };
+    /**
+     * Follow the given account.
+     * @param id The id of the account in the database
+     * @param params Parameters
+     * @return Relationship
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.follow = function (id, params) {
+        return this.http.post("/api/v1/accounts/".concat(id, "/follow"), params);
+    };
+    /**
+     * Unfollow the given account
+     * @param id The id of the account in the database
+     * @return Relationship
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.unfollow = function (id, params) {
+        return this.http.post("/api/v1/accounts/".concat(id, "/unfollow"), params);
+    };
+    /**
+     * Find out whether a given account is followed, blocked, muted, etc.
+     * @param id Array of account IDs to check
+     * @return Array of Relationship
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.fetchRelationships = function (id) {
+        return this.http.get('/api/v1/accounts/relationships', {
+            id: id,
+        });
+    };
+    /**
+     * Search for matching accounts by username or display name.
+     * @param params Parameters
+     * @return Array of Account
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.search = function (params) {
+        return this.http.get("/api/v1/accounts/search", params);
+    };
+    /**
+     * Block the given account. Clients should filter statuses from this account if received (e.g. due to a boost in the Home timeline)
+     * @param id The id of the account in the database
+     * @return Relationship
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.block = function (id) {
+        return this.http.post("/api/v1/accounts/".concat(id, "/block"));
+    };
+    /**
+     * Unblock the given account.
+     * @param id The id of the account in the database
+     * @return Relationship
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.unblock = function (id) {
+        return this.http.post("/api/v1/accounts/".concat(id, "/unblock"));
+    };
+    /**
+     * Add the given account to the user's featured profiles. (Featured profiles are currently shown on the user's own public profile.)
+     * @param id The id of the account in the database
+     * @return Relationship
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.pin = function (id) {
+        return this.http.post("/api/v1/accounts/".concat(id, "/pin"));
+    };
+    /**
+     * Remove the given account from the user's featured profiles.
+     * @param id The id of the account in the database
+     * @return Relationship
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.unpin = function (id) {
+        return this.http.post("/api/v1/accounts/".concat(id, "/unpin"));
+    };
+    /**
+     * Fetch the list with the given ID. Used for verifying the title of a list.
+     * @param id ID of the list in the database
+     * @return Array of List
+     * @see https://docs.joinmastodon.org/methods/timelines/lists/
+     */
+    AccountRepository.prototype.fetchLists = function (id) {
+        return this.http.get("/api/v1/accounts/".concat(id, "/lists"));
+    };
+    /**
+     * Mute the given account. Clients should filter statuses and notifications from this account, if received (e.g. due to a boost in the Home timeline).
+     * @param id The id of the account in the database
+     * @param params Parameter
+     * @return Relationship
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.mute = function (id, params) {
+        return this.http.post("/api/v1/accounts/".concat(id, "/mute"), params);
+    };
+    /**
+     * Unmute the given account.
+     * @param id The id of the account in the database
+     * @return Relationship
+     * @see https://docs.joinmastodon.org/methods/accounts/
+     */
+    AccountRepository.prototype.unmute = function (id) {
+        return this.http.post("/api/v1/accounts/".concat(id, "/unmute"));
+    };
+    /**
+     * Add personal note to the account
+     * @param id ID of the account
+     * @param param Parameters
+     * @return Relationship
+     */
+    AccountRepository.prototype.createNote = function (id, params) {
+        return this.http.post("/api/v1/accounts/".concat(id, "/note"), params);
+    };
+    /**
+     * Get featured tag of the account
+     * @param id ID of the account
+     * @return FeaturedTags
+     */
+    AccountRepository.prototype.fetchFeaturedTags = function (id) {
+        return this.http.get("/api/v1/accounts/".concat(id, "/featured_tags"));
+    };
+    /**
+     * Identity proofs
+     * @param id The id of the account in the database
+     * @return Array of IdentityProof
+     * @see https://github.com/tootsuite/mastodon/pull/10297
+     */
+    AccountRepository.prototype.fetchIdentityProofs = function (id) {
+        return this.http.get("/api/v1/accounts/".concat(id, "/identity_proofs"));
+    };
+    /**
+     * This method allows to quickly convert a username of a known account to an ID that can be used with the REST API, or to check if a username is available for sign-up
+     * @param params Parameters
+     * @return Account
+     */
+    AccountRepository.prototype.lookup = function (params) {
+        return this.http.get('/api/v1/accounts/lookup', params);
+    };
+    /**
+     * TODO: stub
+     * @returns Accounts
+     */
+    AccountRepository.prototype.fetchFamiliarFollowers = function () {
+        return this.http.get("/api/v1/accounts/familiar_followers");
+    };
+    /**
+     * @param id ID of the account
+     * @returns N/A
+     */
+    AccountRepository.prototype.removeFromFollowers = function (id) {
+        return this.http.post("/api/v1/accounts/".concat(id, "/remove_from_followers"));
+    };
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AccountRepository.prototype, "iterateFollowers", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AccountRepository.prototype, "iterateFollowing", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AccountRepository.prototype, "iterateStatuses", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AccountRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '2.7.0' })
+    ], AccountRepository.prototype, "create", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AccountRepository.prototype, "verifyCredentials", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AccountRepository.prototype, "updateCredentials", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AccountRepository.prototype, "follow", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AccountRepository.prototype, "unfollow", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AccountRepository.prototype, "fetchRelationships", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AccountRepository.prototype, "search", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AccountRepository.prototype, "block", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AccountRepository.prototype, "unblock", null);
+    __decorate([
+        version({ since: '2.5.0' })
+    ], AccountRepository.prototype, "pin", null);
+    __decorate([
+        version({ since: '2.5.0' })
+    ], AccountRepository.prototype, "unpin", null);
+    __decorate([
+        version({ since: '2.1.0' })
+    ], AccountRepository.prototype, "fetchLists", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AccountRepository.prototype, "mute", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AccountRepository.prototype, "unmute", null);
+    __decorate([
+        version({ since: '3.2.0' })
+    ], AccountRepository.prototype, "createNote", null);
+    __decorate([
+        version({ since: '3.3.0' })
+    ], AccountRepository.prototype, "fetchFeaturedTags", null);
+    __decorate([
+        version({ since: '2.8.0' })
+    ], AccountRepository.prototype, "fetchIdentityProofs", null);
+    __decorate([
+        version({ since: '3.4.0' })
+    ], AccountRepository.prototype, "lookup", null);
+    __decorate([
+        version({ since: '3.5.0' })
+    ], AccountRepository.prototype, "fetchFamiliarFollowers", null);
+    __decorate([
+        version({ since: '3.5.0' })
+    ], AccountRepository.prototype, "removeFromFollowers", null);
+    return AccountRepository;
+}());
+
+/**
+ * Decorator that verifies the version of the Mastodon instance
+ * @param parameters Optional params
+ */
+var deprecated = function (message) {
+    return function (_target, name, descriptor) {
+        var origin = descriptor.value;
+        if (!origin) {
+            throw new MastoError('deprecated can only apply to a method of a class');
+        }
+        descriptor.value = function () {
+            var _a;
+            var args = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                args[_i] = arguments[_i];
+            }
+            if (process.env.NODE_ENV !== 'production' ||
+                !((_a = this.config) === null || _a === void 0 ? void 0 : _a.disableDeprecatedWarning)) {
+                // eslint-disable-next-line no-console
+                console.warn("#".concat(name.toString(), " is deprecated. ").concat(message));
+            }
+            return origin.apply(this, args);
+        };
+    };
+};
+
+var StreamRepository = /** @class */ (function () {
+    function StreamRepository(ws, version, config) {
+        this.ws = ws;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * Starting home timeline and notification streaming
+     * @return Instance of EventEmitter
+     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
+     */
+    StreamRepository.prototype.streamUser = function () {
+        return this.ws.stream('/api/v1/streaming', {
+            stream: 'user',
+        });
+    };
+    /**
+     * Starting federated timeline streaming
+     * @return Instance of EventEmitter
+     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
+     */
+    StreamRepository.prototype.streamPublicTimeline = function () {
+        return this.ws.stream('/api/v1/streaming', {
+            stream: 'public',
+        });
+    };
+    /**
+     * Starting local timeline streaming
+     * @return Instance of EventEmitter
+     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
+     */
+    StreamRepository.prototype.streamCommunityTimeline = function () {
+        return this.ws.stream('/api/v1/streaming', {
+            stream: 'public:local',
+        });
+    };
+    /**
+     * Stream remote public timeline
+     * @return Instance of EventEmitter
+     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
+     */
+    StreamRepository.prototype.streamRemotePublicTimeline = function () {
+        return this.ws.stream('/api/v1/streaming', {
+            stream: 'public:remote',
+        });
+    };
+    /**
+     * Starting tag timeline streaming
+     * @param id ID of the tag
+     * @return Instance of EventEmitter
+     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
+     */
+    StreamRepository.prototype.streamTagTimeline = function (id) {
+        return this.ws.stream('/api/v1/streaming', {
+            stream: 'hashtag',
+            tag: id,
+        });
+    };
+    /**
+     * Starting local tag timeline streaming
+     * @param id ID of the tag
+     * @return Instance of EventEmitter
+     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
+     */
+    StreamRepository.prototype.streamLocalTagTimeline = function (id) {
+        return this.ws.stream('/api/v1/streaming', {
+            stream: 'hashtag:local',
+            tag: id,
+        });
+    };
+    /**
+     * Starting list timeline streaming
+     * @param id ID of the list
+     * @return Instance of EventEmitter
+     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
+     */
+    StreamRepository.prototype.streamListTimeline = function (id) {
+        return this.ws.stream('/api/v1/streaming', {
+            stream: 'list',
+            list: id,
+        });
+    };
+    /**
+     * Starting direct timeline streaming
+     * @return Instance of EventEmitter
+     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
+     */
+    StreamRepository.prototype.streamDirectTimeline = function () {
+        return this.ws.stream('/api/v1/streaming', {
+            stream: 'direct',
+        });
+    };
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StreamRepository.prototype, "streamUser", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StreamRepository.prototype, "streamPublicTimeline", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StreamRepository.prototype, "streamCommunityTimeline", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StreamRepository.prototype, "streamRemotePublicTimeline", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StreamRepository.prototype, "streamTagTimeline", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StreamRepository.prototype, "streamLocalTagTimeline", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StreamRepository.prototype, "streamListTimeline", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StreamRepository.prototype, "streamDirectTimeline", null);
+    return StreamRepository;
+}());
+
+var AnnouncementRepository = /** @class */ (function () {
+    function AnnouncementRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * Fetch announcements
+     * @return Announcements
+     * @see https://docs.joinmastodon.org/methods/announcements/
+     */
+    AnnouncementRepository.prototype.fetchAll = function () {
+        return this.http.get('/api/v1/announcements');
+    };
+    /**
+     * Dismiss announcement
+     * @param id ID of the announcement
+     * @return Nothing
+     * @see https://docs.joinmastodon.org/methods/announcements/
+     */
+    AnnouncementRepository.prototype.dismiss = function (id) {
+        return this.http.post("/api/v1/announcements/".concat(id, "/dismiss"));
+    };
+    /**
+     * Add a reaction to an announcement
+     * @param id ID of the announcement
+     * @param name Emoji string
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/announcements/
+     */
+    AnnouncementRepository.prototype.addReaction = function (id, name) {
+        return this.http.put("/api/v1/announcements/".concat(id, "/reactions/").concat(name));
+    };
+    /**
+     * Remove a reaction from an announcement
+     * @param id ID of the announcement
+     * @param name Emoji string
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/announcements/
+     */
+    AnnouncementRepository.prototype.removeReaction = function (id, name) {
+        return this.http.delete("/api/v1/announcements/".concat(id, "/reactions/").concat(name));
+    };
+    __decorate([
+        version({ since: '3.1.0' })
+    ], AnnouncementRepository.prototype, "fetchAll", null);
+    __decorate([
+        version({ since: '3.1.0' })
+    ], AnnouncementRepository.prototype, "dismiss", null);
+    __decorate([
+        version({ since: '3.1.0' })
+    ], AnnouncementRepository.prototype, "addReaction", null);
+    __decorate([
+        version({ since: '3.1.0' })
+    ], AnnouncementRepository.prototype, "removeReaction", null);
+    return AnnouncementRepository;
+}());
+
+var AppRepository = /** @class */ (function () {
+    function AppRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * Create a new application to obtain OAuth2 credentials.
+     * @param params Parameters
+     * @return Returns App with `client_id` and `client_secret`
+     * @see https://docs.joinmastodon.org/methods/apps/
+     */
+    AppRepository.prototype.create = function (params) {
+        return this.http.post("/api/v1/apps", params);
+    };
+    /**
+     * Confirm that the app's OAuth2 credentials work.
+     * @return Application
+     * @see https://docs.joinmastodon.org/methods/apps/
+     */
+    AppRepository.prototype.verifyCredentials = function () {
+        return this.http.get("/api/v1/apps/verify_credentials");
+    };
+    __decorate([
+        version({ since: '0.0.0' })
+    ], AppRepository.prototype, "create", null);
+    __decorate([
+        version({ since: '2.0.0' })
+    ], AppRepository.prototype, "verifyCredentials", null);
+    return AppRepository;
+}());
+
+var IterableRepository = /** @class */ (function () {
+    function IterableRepository() {
+        /** @deprecated Use `iterate` instead */
+        this.getIterator = this.iterate.bind(this);
+    }
+    IterableRepository.prototype.fetchMany = function (params) {
+        return this.iterate(params).next();
+    };
+    IterableRepository.prototype[Symbol.asyncIterator] = function () {
+        return __asyncGenerator(this, arguments, function _a() {
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        if (!(this.iterate == undefined)) return [3 /*break*/, 3];
+                        return [5 /*yield**/, __values(__asyncDelegator(__asyncValues([])))];
+                    case 1: return [4 /*yield*/, __await.apply(void 0, [_b.sent()])];
+                    case 2:
+                        _b.sent();
+                        _b.label = 3;
+                    case 3: return [5 /*yield**/, __values(__asyncDelegator(__asyncValues(this.iterate())))];
+                    case 4: return [4 /*yield*/, __await.apply(void 0, [_b.sent()])];
+                    case 5:
+                        _b.sent();
+                        return [2 /*return*/];
+                }
+            });
+        });
+    };
+    return IterableRepository;
+}());
+
+var BlockRepository = /** @class */ (function (_super) {
+    __extends(BlockRepository, _super);
+    function BlockRepository(http, version, config) {
+        var _this = _super.call(this) || this;
+        _this.http = http;
+        _this.version = version;
+        _this.config = config;
+        return _this;
+    }
+    /**
+     * Blocked users
+     * @param params Array of Account
+     * @return Query parameter
+     * @see https://docs.joinmastodon.org/methods/accounts/blocks/
+     */
+    BlockRepository.prototype.iterate = function (params) {
+        return new Paginator(this.http, "/api/v1/blocks", params);
+    };
+    __decorate([
+        version({ since: '0.0.0' })
+    ], BlockRepository.prototype, "iterate", null);
+    return BlockRepository;
+}(IterableRepository));
+
+var BookmarkRepository = /** @class */ (function (_super) {
+    __extends(BookmarkRepository, _super);
+    function BookmarkRepository(http, version, config) {
+        var _this = _super.call(this) || this;
+        _this.http = http;
+        _this.version = version;
+        _this.config = config;
+        return _this;
+    }
+    /**
+     * Statuses the user has bookmarked.
+     * @param params Parameters
+     * @return Array of Statuses
+     * @see https://docs.joinmastodon.org/methods/accounts/bookmarks/
+     */
+    BookmarkRepository.prototype.iterate = function (params) {
+        return new Paginator(this.http, '/api/v1/bookmarks', params);
+    };
+    __decorate([
+        version({ since: '3.1.0' })
+    ], BookmarkRepository.prototype, "iterate", null);
+    return BookmarkRepository;
+}(IterableRepository));
+
+var ConversationRepository = /** @class */ (function (_super) {
+    __extends(ConversationRepository, _super);
+    function ConversationRepository(http, version, config) {
+        var _this = _super.call(this) || this;
+        _this.http = http;
+        _this.version = version;
+        _this.config = config;
+        return _this;
+    }
+    /**
+     * Show conversation
+     * @param params Parameters
+     * @return Array of Conversation
+     * @see https://docs.joinmastodon.org/methods/timelines/conversations/
+     */
+    ConversationRepository.prototype.iterate = function (params) {
+        return new Paginator(this.http, '/api/v1/conversations', params);
+    };
+    /**
+     * Remove conversation
+     * @param id ID of the conversation in the database
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/timelines/conversations/
+     */
+    ConversationRepository.prototype.remove = function (id) {
+        return this.http.delete("/api/v1/conversations/".concat(id));
+    };
+    /**
+     * Mark as read
+     * @param id ID of the conversation in the database
+     * @return Conversation
+     * @see https://docs.joinmastodon.org/methods/timelines/conversations/
+     */
+    ConversationRepository.prototype.read = function (id) {
+        return this.http.post("/api/v1/conversations/".concat(id, "/read"));
+    };
+    __decorate([
+        version({ since: '2.6.0' })
+    ], ConversationRepository.prototype, "iterate", null);
+    __decorate([
+        version({ since: '2.6.0' })
+    ], ConversationRepository.prototype, "remove", null);
+    __decorate([
+        version({ since: '2.6.0' })
+    ], ConversationRepository.prototype, "read", null);
+    return ConversationRepository;
+}(IterableRepository));
+
+var CustomEmojiRepository = /** @class */ (function () {
+    function CustomEmojiRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * Returns custom emojis that are available on the server.
+     * @return Array of Emoji
+     * @see https://docs.joinmastodon.org/methods/instance/custom_emojis/
+     */
+    CustomEmojiRepository.prototype.fetchAll = function () {
+        return this.http.get("/api/v1/custom_emojis");
+    };
+    __decorate([
+        version({ since: '2.0.0' })
+    ], CustomEmojiRepository.prototype, "fetchAll", null);
+    return CustomEmojiRepository;
+}());
+
+var DirectoryRepository = /** @class */ (function () {
+    function DirectoryRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * List accounts visible in the directory.
+     * @param params Parameters
+     * @return Array of Account
+     * @see https://docs.joinmastodon.org/methods/instance/directory/
+     */
+    DirectoryRepository.prototype.fetchAll = function (params) {
+        return this.http.get('/api/v1/directory', params);
+    };
+    __decorate([
+        version({ since: '3.0.0' })
+    ], DirectoryRepository.prototype, "fetchAll", null);
+    return DirectoryRepository;
+}());
+
+var DomainBlockRepository$1 = /** @class */ (function (_super) {
+    __extends(DomainBlockRepository, _super);
+    function DomainBlockRepository(http, version, config) {
+        var _this = _super.call(this) || this;
+        _this.http = http;
+        _this.version = version;
+        _this.config = config;
+        return _this;
+    }
+    /**
+     * View domains the user has blocked.
+     * @param params Parameters
+     * @return Array of strings
+     * @see https://docs.joinmastodon.org/methods/accounts/domain_blocks/
+     */
+    DomainBlockRepository.prototype.iterate = function (params) {
+        return new Paginator(this.http, "/api/v1/domain_blocks", params);
+    };
+    /**
+     * Block a domain to:
+     * - hide all public posts from it
+     * - hide all notifications from it
+     * - remove all followers from it
+     * - prevent following new users from it (but does not remove existing follows)
+     * @param domain Domain to block.
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/accounts/domain_blocks/
+     */
+    DomainBlockRepository.prototype.block = function (domain) {
+        return this.http.post("/api/v1/domain_blocks", {
+            domain: domain,
+        });
+    };
+    /**
+     * Remove a domain block, if it exists in the user's array of blocked domains.
+     * @param domain Domain to unblock
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/accounts/domain_blocks/
+     */
+    DomainBlockRepository.prototype.unblock = function (domain) {
+        return this.http.delete("/api/v1/domain_blocks", {
+            domain: domain,
+        });
+    };
+    __decorate([
+        version({ since: '1.4.0' })
+    ], DomainBlockRepository.prototype, "iterate", null);
+    __decorate([
+        version({ since: '1.4.0' })
+    ], DomainBlockRepository.prototype, "block", null);
+    __decorate([
+        version({ since: '1.4.0' })
+    ], DomainBlockRepository.prototype, "unblock", null);
+    return DomainBlockRepository;
+}(IterableRepository));
+
+var EndorsementRepository = /** @class */ (function (_super) {
+    __extends(EndorsementRepository, _super);
+    function EndorsementRepository(http, version, config) {
+        var _this = _super.call(this) || this;
+        _this.http = http;
+        _this.version = version;
+        _this.config = config;
+        return _this;
+    }
+    /**
+     * Accounts that the user is currently featuring on their profile.
+     * @return Array of Account
+     * @see https://docs.joinmastodon.org/methods/accounts/endorsements/
+     */
+    EndorsementRepository.prototype.iterate = function (params) {
+        return new Paginator(this.http, "/api/v1/endorsements", params);
+    };
+    __decorate([
+        version({ since: '2.5.0' })
+    ], EndorsementRepository.prototype, "iterate", null);
+    return EndorsementRepository;
+}(IterableRepository));
+
+var FavouriteRepository = /** @class */ (function (_super) {
+    __extends(FavouriteRepository, _super);
+    function FavouriteRepository(http, version, config) {
+        var _this = _super.call(this) || this;
+        _this.http = http;
+        _this.version = version;
+        _this.config = config;
+        return _this;
+    }
+    /**
+     * Statuses the user has favourited.
+     * @param params Parameters
+     * @return Array of Status
+     * @see https://docs.joinmastodon.org/methods/accounts/favourites/
+     */
+    FavouriteRepository.prototype.iterate = function (params) {
+        return new Paginator(this.http, "/api/v1/favourites", params);
+    };
+    __decorate([
+        version({ since: '0.0.0' })
+    ], FavouriteRepository.prototype, "iterate", null);
+    return FavouriteRepository;
+}(IterableRepository));
+
+var FeaturedTagRepository = /** @class */ (function () {
+    function FeaturedTagRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * View your featured tags
+     * @return Array of FeaturedTag
+     * @see https://docs.joinmastodon.org/methods/accounts/featured_tags/
+     * @done
+     */
+    FeaturedTagRepository.prototype.fetchAll = function () {
+        return this.http.get('/api/v1/featured_tags');
+    };
+    /**
+     * Feature a tag
+     * @param params Parameters
+     * @return FeaturedTag
+     * @see https://docs.joinmastodon.org/methods/accounts/featured_tags/
+     */
+    FeaturedTagRepository.prototype.create = function (params) {
+        return this.http.post('/api/v1/featured_tags', params);
+    };
+    /**
+     * Shows your 10 most-used tags, with usage history for the past week.
+     * @return Array of Tag with History
+     * @see https://docs.joinmastodon.org/methods/accounts/featured_tags/
+     */
+    FeaturedTagRepository.prototype.fetchSuggestions = function () {
+        return this.http.get('/api/v1/featured_tags/suggestions');
+    };
+    /**
+     * Un-feature a tag
+     * @param id The id of the FeaturedTag to be un-featured
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/accounts/featured_tags/
+     */
+    FeaturedTagRepository.prototype.remove = function (id) {
+        return this.http.delete("/api/v1/featured_tags/".concat(id));
+    };
+    __decorate([
+        version({ since: '3.0.0' })
+    ], FeaturedTagRepository.prototype, "fetchAll", null);
+    __decorate([
+        version({ since: '3.0.0' })
+    ], FeaturedTagRepository.prototype, "create", null);
+    __decorate([
+        version({ since: '3.0.0' })
+    ], FeaturedTagRepository.prototype, "fetchSuggestions", null);
+    __decorate([
+        version({ since: '3.0.0' })
+    ], FeaturedTagRepository.prototype, "remove", null);
+    return FeaturedTagRepository;
+}());
+
+var FilterRepository = /** @class */ (function () {
+    function FilterRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * View all filters
+     * @return Filter
+     * @see https://docs.joinmastodon.org/methods/accounts/filters/
+     */
+    FilterRepository.prototype.fetchAll = function () {
+        return this.http.get("/api/v1/filters");
+    };
+    /**
+     * View a single filter
+     * @param id ID of the filter
+     * @return Returns Filter
+     * @see https://docs.joinmastodon.org/methods/accounts/filters/
+     */
+    FilterRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/filters/".concat(id));
+    };
+    /**
+     * Create a filter
+     * @param params Parameters
+     * @return Filter
+     * @see https://docs.joinmastodon.org/methods/accounts/filters/
+     */
+    FilterRepository.prototype.create = function (params) {
+        return this.http.post("/api/v1/filters", params);
+    };
+    /**
+     * Update a filter
+     * @param id ID of the filter in the database
+     * @param params Parameters
+     * @return Filter
+     * @see https://docs.joinmastodon.org/methods/accounts/filters/
+     */
+    FilterRepository.prototype.update = function (id, params) {
+        return this.http.put("/api/v1/filters/".concat(id), params);
+    };
+    /**
+     * Remove a filter
+     * @param id ID of the filter in the database
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/accounts/filters/
+     */
+    FilterRepository.prototype.remove = function (id) {
+        return this.http.delete("/api/v1/filters/".concat(id));
+    };
+    __decorate([
+        version({ since: '2.4.3' })
+    ], FilterRepository.prototype, "fetchAll", null);
+    __decorate([
+        version({ since: '2.4.3' })
+    ], FilterRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '2.4.3' })
+    ], FilterRepository.prototype, "create", null);
+    __decorate([
+        version({ since: '2.4.3' })
+    ], FilterRepository.prototype, "update", null);
+    __decorate([
+        version({ since: '2.4.3' })
+    ], FilterRepository.prototype, "remove", null);
+    return FilterRepository;
+}());
+
+var FollowRequestRepository = /** @class */ (function (_super) {
+    __extends(FollowRequestRepository, _super);
+    function FollowRequestRepository(http, version, config) {
+        var _this = _super.call(this) || this;
+        _this.http = http;
+        _this.version = version;
+        _this.config = config;
+        return _this;
+    }
+    /**
+     * Pending Follows
+     * @param params Parameters
+     * @return Array of Account
+     * @see https://docs.joinmastodon.org/methods/accounts/follow_requests/
+     */
+    FollowRequestRepository.prototype.iterate = function (params) {
+        return new Paginator(this.http, "/api/v1/follow_requests", params);
+    };
+    /**
+     * Accept Follow
+     * @param id ID of the account in the database
+     * @return Relationship
+     * @see https://docs.joinmastodon.org/methods/accounts/follow_requests/
+     */
+    FollowRequestRepository.prototype.authorize = function (id) {
+        return this.http.post("/api/v1/follow_requests/".concat(id, "/authorize"));
+    };
+    /**
+     * Reject Follow
+     * @param id ID of the account in the database
+     * @return Relationship
+     * @see https://docs.joinmastodon.org/methods/accounts/follow_requests/
+     */
+    FollowRequestRepository.prototype.reject = function (id) {
+        return this.http.post("/api/v1/follow_requests/".concat(id, "/reject"));
+    };
+    __decorate([
+        version({ since: '0.0.0' })
+    ], FollowRequestRepository.prototype, "iterate", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], FollowRequestRepository.prototype, "authorize", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], FollowRequestRepository.prototype, "reject", null);
+    return FollowRequestRepository;
+}(IterableRepository));
+
+var InstanceRepository = /** @class */ (function () {
+    function InstanceRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * Information about the server.
+     * @return Instance
+     * @see https://docs.joinmastodon.org/methods/instance/
+     */
+    InstanceRepository.prototype.fetch = function () {
+        return this.http.get('/api/v1/instance');
+    };
+    /**
+     * Domains that this instance is aware of.
+     * @return Array of Activity
+     * @see https://docs.joinmastodon.org/methods/instance/
+     */
+    InstanceRepository.prototype.fetchPeers = function () {
+        return this.http.get('/api/v1/instance/peers');
+    };
+    /**
+     * Instance activity over the last 3 months, binned weekly.
+     * @return Array of Activity
+     * @see https://docs.joinmastodon.org/methods/instance/
+     */
+    InstanceRepository.prototype.fetchActivity = function () {
+        return this.http.get('/api/v1/instance/activity');
+    };
+    __decorate([
+        version({ since: '1.0.0' })
+    ], InstanceRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '2.1.2' })
+    ], InstanceRepository.prototype, "fetchPeers", null);
+    __decorate([
+        version({ since: '2.1.2' })
+    ], InstanceRepository.prototype, "fetchActivity", null);
+    return InstanceRepository;
+}());
+
+var ListRepository = /** @class */ (function () {
+    function ListRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+        /** @deprecated Use `iterateAccounts` instead */
+        this.getAccountIterator = this.iterateAccounts.bind(this);
+    }
+    ListRepository.prototype.iterateAccounts = function (id, params) {
+        return new Paginator(this.http, "/api/v1/lists/".concat(id, "/accounts"), params);
+    };
+    /**
+     * Fetch the list with the given ID. Used for verifying the title of a list.
+     * @param id ID of the list in the database
+     * @return List
+     * @see https://docs.joinmastodon.org/methods/timelines/lists/
+     */
+    ListRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/lists/".concat(id));
+    };
+    /**
+     * Fetch all lists that the user owns.
+     * @return Array of List
+     * @see https://docs.joinmastodon.org/methods/timelines/lists/
+     */
+    ListRepository.prototype.fetchAll = function () {
+        return this.http.get('/api/v1/lists');
+    };
+    /**
+     * Create a new list.
+     * @param params Parameters
+     * @return List
+     * @see https://docs.joinmastodon.org/methods/timelines/lists/
+     */
+    ListRepository.prototype.create = function (params) {
+        return this.http.post('/api/v1/lists', params);
+    };
+    /**
+     * Change the title of a list.
+     * @param id ID of the list in the database
+     * @param params Parameters
+     * @return List
+     * @see https://docs.joinmastodon.org/methods/timelines/lists/
+     */
+    ListRepository.prototype.update = function (id, params) {
+        return this.http.put("/api/v1/lists/".concat(id), params);
+    };
+    /**
+     * Delete a list
+     * @param id ID of the list in the database
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/timelines/lists/
+     */
+    ListRepository.prototype.remove = function (id) {
+        return this.http.delete("/api/v1/lists/".concat(id));
+    };
+    /**
+     * View accounts in list
+     * @param id ID of the list in the database
+     * @param params Parameters
+     * @return Array of Account
+     * @see https://docs.joinmastodon.org/methods/timelines/lists/
+     */
+    ListRepository.prototype.fetchAccounts = function (id, params) {
+        return this.iterateAccounts(id, params).next();
+    };
+    /**
+     * Add accounts to the given list. Note that the user must be following these accounts.
+     * @param id ID of the list in the database
+     * @param params Parameters
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/timelines/lists/
+     */
+    ListRepository.prototype.addAccount = function (id, params) {
+        return this.http.post("/api/v1/lists/".concat(id, "/accounts"), params);
+    };
+    /**
+     * Remove accounts from the given list.
+     * @param id ID of the list in the database
+     * @param params Parameters
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/timelines/lists/
+     */
+    ListRepository.prototype.removeAccount = function (id, params) {
+        return this.http.delete("/api/v1/lists/".concat(id, "/accounts"), params);
+    };
+    __decorate([
+        version({ since: '2.1.0' })
+    ], ListRepository.prototype, "iterateAccounts", null);
+    __decorate([
+        version({ since: '2.1.0' })
+    ], ListRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '2.1.0' })
+    ], ListRepository.prototype, "fetchAll", null);
+    __decorate([
+        version({ since: '2.1.0' })
+    ], ListRepository.prototype, "create", null);
+    __decorate([
+        version({ since: '2.1.0' })
+    ], ListRepository.prototype, "update", null);
+    __decorate([
+        version({ since: '2.1.0' })
+    ], ListRepository.prototype, "remove", null);
+    __decorate([
+        version({ since: '2.1.0' })
+    ], ListRepository.prototype, "addAccount", null);
+    __decorate([
+        version({ since: '2.1.0' })
+    ], ListRepository.prototype, "removeAccount", null);
+    return ListRepository;
+}());
+
+var MarkerRepository = /** @class */ (function () {
+    function MarkerRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * Get saved timeline position
+     * @param params Parameters
+     * @return Markers
+     * @see https://docs.joinmastodon.org/methods/timelines/markers/
+     */
+    MarkerRepository.prototype.fetch = function (params) {
+        return this.http.get('/api/v1/markers', params);
+    };
+    /**
+     * Save position in timeline
+     * @param params Parameters
+     * @return Markers
+     * @see https://github.com/tootsuite/mastodon/pull/11762
+     */
+    MarkerRepository.prototype.create = function (params) {
+        return this.http.post('/api/v1/markers', params);
+    };
+    __decorate([
+        version({ since: '3.0.0' })
+    ], MarkerRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '3.0.0' })
+    ], MarkerRepository.prototype, "create", null);
+    return MarkerRepository;
+}());
+
+var delay = function (ms) {
+    return new Promise(function (resolve) { return setTimeout(function () { return resolve(); }, ms); });
+};
+
+var timeout = function (task, ms) { return __awaiter(void 0, void 0, void 0, function () {
+    var cancellationToken, timeoutPromise, mainPromise;
+    return __generator(this, function (_a) {
+        if (ms == undefined) {
+            return [2 /*return*/, task];
+        }
+        timeoutPromise = new Promise(function (_, reject) {
+            cancellationToken = setTimeout(function () { return void reject(new MastoTimeoutError("Timeout of ".concat(ms, "ms exceeded"))); }, ms);
+        });
+        mainPromise = task.then(function (value) {
+            clearTimeout(cancellationToken);
+            return value;
+        });
+        return [2 /*return*/, Promise.race([timeoutPromise, mainPromise])];
+    });
+}); };
+
+var MediaAttachmentRepository = /** @class */ (function () {
+    function MediaAttachmentRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * @experimental
+     * @param id ID of the media
+     * @param interval interval of polling
+     * @returns Media attachment that has done processing
+     */
+    MediaAttachmentRepository.prototype.waitFor = function (id, interval) {
+        var _this = this;
+        var _a;
+        if (interval === void 0) { interval = 1000; }
+        return timeout((function () { return __awaiter(_this, void 0, void 0, function () {
+            var media, processing;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        if (!(media == undefined)) return [3 /*break*/, 3];
+                        return [4 /*yield*/, delay(interval)];
+                    case 1:
+                        _a.sent();
+                        return [4 /*yield*/, this.fetch(id)];
+                    case 2:
+                        processing = _a.sent();
+                        if (processing.url != undefined) {
+                            media = processing;
+                        }
+                        return [3 /*break*/, 0];
+                    case 3: return [2 /*return*/, media];
+                }
+            });
+        }); })(), (_a = this.config.timeout) !== null && _a !== void 0 ? _a : 3000);
+    };
+    /**
+     * Creates an attachment to be used with a new status.
+     * @param params Parameters
+     * @return Attachment
+     * @see https://docs.joinmastodon.org/methods/statuses/media/
+     */
+    MediaAttachmentRepository.prototype.create = function (_a) {
+        var _b = _a.skipPolling, skipPolling = _b === void 0 ? false : _b, params = __rest(_a, ["skipPolling"]);
+        return __awaiter(this, void 0, void 0, function () {
+            var media;
+            return __generator(this, function (_c) {
+                switch (_c.label) {
+                    case 0: return [4 /*yield*/, this.http.post("/api/v2/media", params, {
+                            headers: { 'Content-Type': 'multipart/form-data' },
+                        })];
+                    case 1:
+                        media = _c.sent();
+                        if (skipPolling)
+                            return [2 /*return*/, media];
+                        return [2 /*return*/, this.waitFor(media.id)];
+                }
+            });
+        });
+    };
+    /**
+     * Fetches an attachment to be used with a new status.
+     * @param id ID of the attachment
+     * @see https://github.com/tootsuite/mastodon/pull/13210
+     */
+    MediaAttachmentRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/media/".concat(id));
+    };
+    /**
+     * Update an Attachment, before it is attached to a status and posted.
+     * @param id The id of the Attachment entity to be updated
+     * @param params Parameters
+     * @return Attachment
+     * @see https://docs.joinmastodon.org/methods/statuses/media/
+     */
+    MediaAttachmentRepository.prototype.update = function (id, _a) {
+        var _b = _a.skipPolling, skipPolling = _b === void 0 ? false : _b, params = __rest(_a, ["skipPolling"]);
+        return __awaiter(this, void 0, void 0, function () {
+            var media;
+            return __generator(this, function (_c) {
+                switch (_c.label) {
+                    case 0: return [4 /*yield*/, this.http.put("/api/v1/media/".concat(id), params, {
+                            headers: { 'Content-Type': 'multipart/form-data' },
+                        })];
+                    case 1:
+                        media = _c.sent();
+                        if (skipPolling)
+                            return [2 /*return*/, media];
+                        return [2 /*return*/, this.waitFor(media.id)];
+                }
+            });
+        });
+    };
+    /**
+     * Creates an attachment to be used with a new status.
+     * @param params Parameters
+     * @return Attachment
+     * @see https://docs.joinmastodon.org/methods/statuses/media/
+     */
+    MediaAttachmentRepository.prototype.v1__create = function (params) {
+        return this.http.post("/api/v1/media", params, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    };
+    __decorate([
+        version({ since: '3.1.3' })
+    ], MediaAttachmentRepository.prototype, "create", null);
+    __decorate([
+        version({ since: '3.1.3' })
+    ], MediaAttachmentRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], MediaAttachmentRepository.prototype, "update", null);
+    __decorate([
+        deprecated('Use Masto.media#create instead'),
+        version({ since: '0.0.0', until: '3.1.3' })
+    ], MediaAttachmentRepository.prototype, "v1__create", null);
+    return MediaAttachmentRepository;
+}());
+
+var MuteRepository = /** @class */ (function (_super) {
+    __extends(MuteRepository, _super);
+    function MuteRepository(http, version, config) {
+        var _this = _super.call(this) || this;
+        _this.http = http;
+        _this.version = version;
+        _this.config = config;
+        return _this;
+    }
+    /**
+     * Accounts the user has muted.
+     * @param params Parameters
+     * @return Array of Account
+     * @see https://docs.joinmastodon.org/methods/accounts/mutes/
+     */
+    MuteRepository.prototype.iterate = function (params) {
+        return new Paginator(this.http, '/api/v1/mutes', params);
+    };
+    __decorate([
+        version({ since: '0.0.0' })
+    ], MuteRepository.prototype, "iterate", null);
+    return MuteRepository;
+}(IterableRepository));
+
+var NotificationsRepository = /** @class */ (function (_super) {
+    __extends(NotificationsRepository, _super);
+    function NotificationsRepository(http, version, config) {
+        var _this = _super.call(this) || this;
+        _this.http = http;
+        _this.version = version;
+        _this.config = config;
+        return _this;
+    }
+    /**
+     * Notifications concerning the user.
+     * This API returns Link headers containing links to the next/previous page.
+     * However, the links can also be constructed dynamically using query params and `id` values.
+     * @param params Query parameter
+     * @return Array of Notification
+     * @see https://docs.joinmastodon.org/methods/notifications/
+     */
+    NotificationsRepository.prototype.iterate = function (params) {
+        return new Paginator(this.http, '/api/v1/notifications', params);
+    };
+    /**
+     * View information about a notification with a given ID.
+     * @param id ID of the notification in the database.
+     * @return Notification
+     * @see https://docs.joinmastodon.org/methods/notifications/
+     */
+    NotificationsRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/notifications/".concat(id));
+    };
+    /**
+     * Clear all notifications from the server.
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/notifications/
+     */
+    NotificationsRepository.prototype.clear = function () {
+        return this.http.post('/api/v1/notifications/clear');
+    };
+    /**
+     * Clear a single notification from the server.
+     * @param id ID of the notification to be cleared
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/notifications/
+     */
+    NotificationsRepository.prototype.dismiss = function (id) {
+        return this.http.post("/api/v1/notifications/".concat(id, "/dismiss"));
+    };
+    __decorate([
+        version({ since: '0.0.0' })
+    ], NotificationsRepository.prototype, "iterate", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], NotificationsRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], NotificationsRepository.prototype, "clear", null);
+    __decorate([
+        version({ since: '2.6.0' })
+    ], NotificationsRepository.prototype, "dismiss", null);
+    return NotificationsRepository;
+}(IterableRepository));
+
+var PollRepository = /** @class */ (function () {
+    function PollRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * View a poll
+     * @param id ID of the poll in the database
+     * @return Poll
+     * @see https://docs.joinmastodon.org/methods/statuses/polls/
+     */
+    PollRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/polls/".concat(id));
+    };
+    /**
+     * Vote on a poll
+     * @param id ID of the poll in the database
+     * @param params Parameters
+     * @return Poll
+     * @see https://docs.joinmastodon.org/methods/statuses/polls/
+     */
+    PollRepository.prototype.vote = function (id, params) {
+        return this.http.post("/api/v1/polls/".concat(id, "/votes"), params);
+    };
+    __decorate([
+        version({ since: '2.8.0' })
+    ], PollRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '2.8.0' })
+    ], PollRepository.prototype, "vote", null);
+    return PollRepository;
+}());
+
+var PreferenceRepository = /** @class */ (function () {
+    function PreferenceRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * Preferences defined by the user in their account settings.
+     * @return Preferences by key and value
+     * @see https://docs.joinmastodon.org/methods/accounts/preferences/
+     */
+    PreferenceRepository.prototype.fetch = function () {
+        return this.http.get('/api/v1/preferences');
+    };
+    __decorate([
+        version({ since: '2.8.0' })
+    ], PreferenceRepository.prototype, "fetch", null);
+    return PreferenceRepository;
+}());
+
+var PushSubscriptionsRepository = /** @class */ (function () {
+    function PushSubscriptionsRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * Add a Web Push API subscription to receive notifications.
+     * Each access token can have one push subscription.
+     * If you create a new subscription, the old subscription is deleted.
+     * @param params Parameters
+     * @return Returns Push Subscription
+     * @see https://docs.joinmastodon.org/methods/notifications/push/
+     */
+    PushSubscriptionsRepository.prototype.create = function (params) {
+        return this.http.post('/api/v1/push/subscription', params);
+    };
+    /**
+     * View the PushSubscription currently associated with this access token.
+     * @return PushSubscription
+     * @see https://docs.joinmastodon.org/methods/notifications/push/
+     */
+    PushSubscriptionsRepository.prototype.fetch = function () {
+        return this.http.get('/api/v1/push/subscription');
+    };
+    /**
+     * Updates the current push subscription. Only the data part can be updated. To change fundamentals, a new subscription must be created instead.
+     * @param params Parameters
+     * @return PushSubscription
+     * @see https://docs.joinmastodon.org/methods/notifications/push/
+     */
+    PushSubscriptionsRepository.prototype.update = function (params) {
+        return this.http.put('/api/v1/push/subscription', params);
+    };
+    /**
+     * Removes the current Web Push API subscription.
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/notifications/push/
+     */
+    PushSubscriptionsRepository.prototype.remove = function () {
+        return this.http.delete('/api/v1/push/subscription');
+    };
+    __decorate([
+        version({ since: '2.4.0' })
+    ], PushSubscriptionsRepository.prototype, "create", null);
+    __decorate([
+        version({ since: '2.4.0' })
+    ], PushSubscriptionsRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '2.4.0' })
+    ], PushSubscriptionsRepository.prototype, "update", null);
+    __decorate([
+        version({ since: '2.4.0' })
+    ], PushSubscriptionsRepository.prototype, "remove", null);
+    return PushSubscriptionsRepository;
+}());
+
+var ReportRepository$1 = /** @class */ (function () {
+    function ReportRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * File a report
+     * @param params Parameters
+     * @return Report
+     * @see https://docs.joinmastodon.org/methods/accounts/reports/
+     */
+    ReportRepository.prototype.create = function (params) {
+        return this.http.post('/api/v1/reports', params);
+    };
+    __decorate([
+        version({ since: '1.1.0' })
+    ], ReportRepository.prototype, "create", null);
+    return ReportRepository;
+}());
+
+var ScheduledStatusesRepository = /** @class */ (function (_super) {
+    __extends(ScheduledStatusesRepository, _super);
+    function ScheduledStatusesRepository(http, version, config) {
+        var _this = _super.call(this) || this;
+        _this.http = http;
+        _this.version = version;
+        _this.config = config;
+        return _this;
+    }
+    /**
+     * View scheduled statuses
+     * @param params Parameters
+     * @return Array of ScheduledStatus
+     * @see https://docs.joinmastodon.org/methods/statuses/scheduled_statuses/
+     */
+    ScheduledStatusesRepository.prototype.iterate = function (params) {
+        return new Paginator(this.http, '/api/v1/scheduled_statuses', params);
+    };
+    /**
+     * View a single scheduled status
+     * @param id ID of the scheduled status in the database.
+     * @return ScheduledStatus
+     * @see https://docs.joinmastodon.org/methods/statuses/scheduled_statuses/
+     */
+    ScheduledStatusesRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/scheduled_statuses/".concat(id));
+    };
+    /**
+     * Update Scheduled status
+     * @param id ID of the Status to be scheduled
+     * @param params Parameters
+     * @return ScheduledStatus
+     * @see https://docs.joinmastodon.org/api/rest/scheduled-statuses/#put-api-v1-scheduled-statuses-id
+     */
+    ScheduledStatusesRepository.prototype.update = function (id, params) {
+        return this.http.put("/api/v1/scheduled_statuses/".concat(id), params);
+    };
+    /**
+     * Cancel a scheduled status
+     * @param id ID of the scheduled status in the database.
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/statuses/scheduled_statuses/
+     */
+    ScheduledStatusesRepository.prototype.remove = function (id) {
+        return this.http.delete("/api/v1/scheduled_statuses/".concat(id));
+    };
+    __decorate([
+        version({ since: '2.7.0' })
+    ], ScheduledStatusesRepository.prototype, "iterate", null);
+    __decorate([
+        version({ since: '2.7.0' })
+    ], ScheduledStatusesRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '2.7.0' })
+    ], ScheduledStatusesRepository.prototype, "update", null);
+    __decorate([
+        version({ since: '2.7.0' })
+    ], ScheduledStatusesRepository.prototype, "remove", null);
+    return ScheduledStatusesRepository;
+}(IterableRepository));
+
+var StatusRepository = /** @class */ (function () {
+    function StatusRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * View information about a status.
+     * @param id Local ID of a status in the database.
+     * @return Status
+     * @see https://docs.joinmastodon.org/methods/statuses/
+     */
+    StatusRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/statuses/".concat(id));
+    };
+    /**
+     * Post a new status.
+     * @param params Parameters
+     * @param idempotencyKey Prevent duplicate submissions of the same status. Idempotency keys are stored for up to 1 hour, and can be any arbitrary string. Consider using a hash or UUID generated client-side.
+     * @return Status. When scheduled_at is present, ScheduledStatus is returned instead.
+     * @see https://docs.joinmastodon.org/api/rest/statuses/#post-api-v1-statuses
+     */
+    StatusRepository.prototype.create = function (params, idempotencyKey) {
+        if (idempotencyKey) {
+            return this.http.post('/api/v1/statuses', params, {
+                headers: { 'Idempotency-Key': idempotencyKey },
+            });
+        }
+        return this.http.post('/api/v1/statuses', params);
+    };
+    /**
+     * Update a status
+     * @param params Parameters
+     * @return Status. When scheduled_at is present, ScheduledStatus is returned instead.
+     * @see https://docs.joinmastodon.org/api/rest/statuses/#post-api-v1-statuses
+     */
+    StatusRepository.prototype.update = function (id, params) {
+        return this.http.put("/api/v1/statuses/".concat(id), params);
+    };
+    /**
+     * Delete one of your own statuses.
+     * @param id Local ID of a status in the database. Must be owned by authenticated account.
+     * @return Status with source text and `media_attachments` or `poll`
+     * @see https://docs.joinmastodon.org/methods/statuses/
+     */
+    StatusRepository.prototype.remove = function (id) {
+        return this.http.delete("/api/v1/statuses/".concat(id));
+    };
+    /**
+     * View statuses above and below this status in the thread.
+     * @param id Local ID of a status in the database.
+     * @return Context
+     * @see https://docs.joinmastodon.org/methods/statuses/
+     */
+    StatusRepository.prototype.fetchContext = function (id) {
+        return this.http.get("/api/v1/statuses/".concat(id, "/context"));
+    };
+    /**
+     * Preview card
+     * @deprecated Use `card` attribute of status instead
+     * @param id ID of the status in the database
+     * @return Card
+     * @see https://docs.joinmastodon.org/api/rest/statuses/#get-api-v1-statuses-id-card
+     */
+    StatusRepository.prototype.fetchCard = function (id) {
+        return this.http.get("/api/v1/statuses/".concat(id, "/card"));
+    };
+    /**
+     * Add a status to your favourites list.
+     * @param id Local ID of a status in the database.
+     * @return Status
+     * @see https://docs.joinmastodon.org/methods/statuses/
+     */
+    StatusRepository.prototype.favourite = function (id) {
+        return this.http.post("/api/v1/statuses/".concat(id, "/favourite"));
+    };
+    /**
+     * Remove a status from your favourites list.
+     * @param id Local ID of a status in the database.
+     * @return Status
+     * @see https://docs.joinmastodon.org/methods/statuses/
+     */
+    StatusRepository.prototype.unfavourite = function (id) {
+        return this.http.post("/api/v1/statuses/".concat(id, "/unfavourite"));
+    };
+    /**
+     * Do not receive notifications for the thread that this status is part of. Must be a thread in which you are a participant.
+     * @param id Local ID of a status in the database.
+     * @return Status
+     * @see https://docs.joinmastodon.org/methods/statuses/
+     */
+    StatusRepository.prototype.mute = function (id) {
+        return this.http.post("/api/v1/statuses/".concat(id, "/mute"));
+    };
+    /**
+     * Start receiving notifications again for the thread that this status is part of.
+     * @param id Local ID of a status in the database.
+     * @return Status
+     * @see https://docs.joinmastodon.org/methods/statuses/
+     */
+    StatusRepository.prototype.unmute = function (id) {
+        return this.http.post("/api/v1/statuses/".concat(id, "/unmute"));
+    };
+    /**
+     * View who boosted a given status.
+     * @param id Local ID of a status in the database.
+     * @return Array of Account
+     * @see https://docs.joinmastodon.org/methods/statuses/
+     */
+    StatusRepository.prototype.fetchRebloggedBy = function (id) {
+        return this.http.get("/api/v1/statuses/".concat(id, "/reblogged_by"));
+    };
+    /**
+     * View who favourited a given status.
+     * @param id Local ID of a status in the database.
+     * @return Array of Account
+     * @see https://docs.joinmastodon.org/methods/statuses/
+     */
+    StatusRepository.prototype.fetchFavouritedBy = function (id) {
+        return this.http.get("/api/v1/statuses/".concat(id, "/favourited_by"));
+    };
+    /**
+     * Re-share a status.
+     * @param id Local ID of a status in the database.
+     * @return Status
+     * @see https://docs.joinmastodon.org/api/rest/statuses/#post-api-v1-statuses-id-reblog
+     */
+    StatusRepository.prototype.reblog = function (id, params) {
+        return this.http.post("/api/v1/statuses/".concat(id, "/reblog"), params);
+    };
+    /**
+     * Undo a re-share of a status.
+     * @param id Local ID of a status in the database.
+     * @return Status
+     * @see https://docs.joinmastodon.org/methods/statuses/
+     */
+    StatusRepository.prototype.unreblog = function (id) {
+        return this.http.post("/api/v1/statuses/".concat(id, "/unreblog"));
+    };
+    /**
+     * Feature one of your own public statuses at the top of your profile.
+     * @param id Local ID of a status in the database. The status should be public and authored by the authorized account.
+     * @return Status
+     * @see https://docs.joinmastodon.org/methods/statuses/
+     */
+    StatusRepository.prototype.pin = function (id) {
+        return this.http.post("/api/v1/statuses/".concat(id, "/pin"));
+    };
+    /**
+     * Un-feature a status from the top of your profile.
+     * @param id Local ID of a status in the database.
+     * @return Status
+     * @see https://docs.joinmastodon.org/methods/statuses/
+     */
+    StatusRepository.prototype.unpin = function (id) {
+        return this.http.post("/api/v1/statuses/".concat(id, "/unpin"));
+    };
+    /**
+     * Privately bookmark a status.
+     * @param id ID of the status in the database
+     * @return Status
+     * @see https://docs.joinmastodon.org/methods/statuses/
+     */
+    StatusRepository.prototype.bookmark = function (id) {
+        return this.http.post("/api/v1/statuses/".concat(id, "/bookmark"));
+    };
+    /**
+     * Remove a status from your private bookmarks.
+     * @param id ID of the status in the database
+     * @return Status
+     * @see https://docs.joinmastodon.org/methods/statuses/
+     */
+    StatusRepository.prototype.unbookmark = function (id) {
+        return this.http.post("/api/v1/statuses/".concat(id, "/unbookmark"));
+    };
+    StatusRepository.prototype.fetchHistory = function (id) {
+        return this.http.get("/api/v1/statuses/".concat(id, "/history"));
+    };
+    StatusRepository.prototype.fetchSource = function (id) {
+        return this.http.get("/api/v1/statuses/".concat(id, "/source"));
+    };
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StatusRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StatusRepository.prototype, "create", null);
+    __decorate([
+        version({ since: '3.5.0' })
+    ], StatusRepository.prototype, "update", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StatusRepository.prototype, "remove", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StatusRepository.prototype, "fetchContext", null);
+    __decorate([
+        deprecated('Use `card` attribute of status instead'),
+        version({ since: '0.0.0', until: '2.9.3' })
+    ], StatusRepository.prototype, "fetchCard", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StatusRepository.prototype, "favourite", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StatusRepository.prototype, "unfavourite", null);
+    __decorate([
+        version({ since: '1.4.2' })
+    ], StatusRepository.prototype, "mute", null);
+    __decorate([
+        version({ since: '1.4.2' })
+    ], StatusRepository.prototype, "unmute", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StatusRepository.prototype, "fetchRebloggedBy", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StatusRepository.prototype, "fetchFavouritedBy", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StatusRepository.prototype, "reblog", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], StatusRepository.prototype, "unreblog", null);
+    __decorate([
+        version({ since: '1.6.0' })
+    ], StatusRepository.prototype, "pin", null);
+    __decorate([
+        version({ since: '1.6.0' })
+    ], StatusRepository.prototype, "unpin", null);
+    __decorate([
+        version({ since: '3.1.0' })
+    ], StatusRepository.prototype, "bookmark", null);
+    __decorate([
+        version({ since: '3.1.0' })
+    ], StatusRepository.prototype, "unbookmark", null);
+    __decorate([
+        version({ since: '3.5.0' })
+    ], StatusRepository.prototype, "fetchHistory", null);
+    __decorate([
+        version({ since: '3.5.0' })
+    ], StatusRepository.prototype, "fetchSource", null);
+    return StatusRepository;
+}());
+
+var SuggestionRepository = /** @class */ (function () {
+    function SuggestionRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * View follow suggestions.
+     * Accounts that are promoted by staff, or that the user has had past positive interactions with, but is not yet following.
+     * @param params
+     * @returns
+     */
+    SuggestionRepository.prototype.fetchAll = function (params) {
+        return this.http.get('/api/v2/suggestions', params);
+    };
+    /**
+     * Remove an account from follow suggestions.
+     * @param id id of the account in the database to be removed from suggestions
+     * @return N/A
+     * @see https://docs.joinmastodon.org/methods/accounts/suggestions/
+     */
+    SuggestionRepository.prototype.remove = function (id) {
+        return this.http.delete("/api/v1/suggestions/".concat(id));
+    };
+    __decorate([
+        version({ since: '2.4.3' })
+    ], SuggestionRepository.prototype, "remove", null);
+    return SuggestionRepository;
+}());
+
+var TimelinesRepository = /** @class */ (function () {
+    function TimelinesRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+        // ====
+        /** @deprecated Use `iterateHashtag` instead. */
+        this.getTagIterable = this.iterateHashtag.bind(this);
+        /** @deprecated Use `iterateList` instead. */
+        this.getList = this.iterateList.bind(this);
+        /** @deprecated Use `iterateDirect` instead. */
+        this.getDirect = this.iterateDirect.bind(this);
+        /** @deprecated Use `iterateHome` instead` */
+        this.getHomeIterable = this.iterateHome.bind(this);
+        /** @deprecated Use `iteratePublic` instead` */
+        this.getPublicIterable = this.iteratePublic.bind(this);
+        /** @deprecated Use `iterateHashtag` instead` */
+        this.getHashtagIterable = this.iterateHashtag.bind(this);
+        /** @deprecated Use `iterateList` instead` */
+        this.getListIterable = this.iterateList.bind(this);
+        /** @deprecated Use `iterateDirect` instead` */
+        this.getDirectIterable = this.iterateDirect.bind(this);
+    }
+    TimelinesRepository.prototype.iterateHome = function (params) {
+        return new Paginator(this.http, '/api/v1/timelines/home', params);
+    };
+    TimelinesRepository.prototype.iteratePublic = function (params) {
+        return new Paginator(this.http, '/api/v1/timelines/public', params);
+    };
+    TimelinesRepository.prototype.iterateHashtag = function (hashtag, params) {
+        return new Paginator(this.http, "/api/v1/timelines/tag/".concat(hashtag), params);
+    };
+    TimelinesRepository.prototype.iterateList = function (id, params) {
+        return new Paginator(this.http, "/api/v1/timelines/list/".concat(id), params);
+    };
+    TimelinesRepository.prototype.iterateDirect = function (params) {
+        return new Paginator(this.http, '/api/v1/timelines/direct', params);
+    };
+    Object.defineProperty(TimelinesRepository.prototype, "home", {
+        get: function () {
+            return this.iterateHome();
+        },
+        enumerable: false,
+        configurable: true
+    });
+    Object.defineProperty(TimelinesRepository.prototype, "public", {
+        get: function () {
+            return this.iteratePublic();
+        },
+        enumerable: false,
+        configurable: true
+    });
+    // ====
+    /**
+     * View statuses from followed users.
+     * @param params Parameters
+     * @return Array of Status
+     * @see https://docs.joinmastodon.org/methods/timelines/
+     */
+    TimelinesRepository.prototype.fetchHome = function (params) {
+        return this.iterateHome(params).next();
+    };
+    /**
+     * Public timeline
+     * @param params Parameters
+     * @return Array of Status
+     * @see https://docs.joinmastodon.org/methods/timelines/
+     */
+    TimelinesRepository.prototype.fetchPublic = function (params) {
+        return this.iteratePublic(params).next();
+    };
+    /**
+     * View public statuses containing the given hashtag.
+     * @param hashtag Content of a #hashtag, not including # symbol.
+     * @param params Parameters
+     * @return Array of Status
+     * @see https://docs.joinmastodon.org/methods/timelines/
+     */
+    TimelinesRepository.prototype.fetchHashtag = function (hashtag, params) {
+        return this.iterateHashtag(hashtag, params).next();
+    };
+    /**
+     * View statuses in the given list timeline.
+     * @param id Local ID of the list in the database.
+     * @param params Query parameter
+     * @return Array of Status
+     * @see https://docs.joinmastodon.org/methods/timelines/
+     */
+    TimelinesRepository.prototype.fetchList = function (id, params) {
+        return this.iterateList(id, params).next();
+    };
+    /**
+     * View statuses with a “direct” privacy, from your account or in your notifications.
+     * @deprecated Use conversations API instead
+     * @return Array of Status
+     * @see https://docs.joinmastodon.org/methods/timelines/
+     */
+    TimelinesRepository.prototype.fetchDirect = function (params) {
+        return this.iterateDirect(params).next();
+    };
+    __decorate([
+        version({ since: '0.0.0' })
+    ], TimelinesRepository.prototype, "iterateHome", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], TimelinesRepository.prototype, "iteratePublic", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], TimelinesRepository.prototype, "iterateHashtag", null);
+    __decorate([
+        version({ since: '2.1.0' })
+    ], TimelinesRepository.prototype, "iterateList", null);
+    __decorate([
+        deprecated('Use conversations API instead'),
+        version({ since: '0.0.0', until: '2.9.3' })
+    ], TimelinesRepository.prototype, "iterateDirect", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], TimelinesRepository.prototype, "fetchHome", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], TimelinesRepository.prototype, "fetchPublic", null);
+    __decorate([
+        version({ since: '0.0.0' })
+    ], TimelinesRepository.prototype, "fetchHashtag", null);
+    __decorate([
+        version({ since: '2.1.0' })
+    ], TimelinesRepository.prototype, "fetchList", null);
+    __decorate([
+        deprecated('Use conversations API instead'),
+        version({ since: '0.0.0', until: '2.9.3' })
+    ], TimelinesRepository.prototype, "fetchDirect", null);
+    return TimelinesRepository;
+}());
+
+var TrendRepository = /** @class */ (function () {
+    function TrendRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+        /** @deprecated Use `fetchTags` */
+        this.fetchAll = this.fetchTags.bind(this);
+        /** @deprecated Use `iterateStatuses` instead */
+        this.getStatuses = this.iterateStatuses.bind(this);
+        /** @deprecated Use `iterateStatuses` instead */
+        this.getLinks = this.iterateLinks.bind(this);
+    }
+    TrendRepository.prototype.iterateStatuses = function (params) {
+        return new Paginator(this.http, '/api/v1/trends/statuses', params);
+    };
+    TrendRepository.prototype.iterateLinks = function (params) {
+        return new Paginator(this.http, '/api/v1/trends/links', params);
+    };
+    Object.defineProperty(TrendRepository.prototype, "statuses", {
+        get: function () {
+            return this.iterateStatuses();
+        },
+        enumerable: false,
+        configurable: true
+    });
+    Object.defineProperty(TrendRepository.prototype, "links", {
+        get: function () {
+            return this.iterateLinks();
+        },
+        enumerable: false,
+        configurable: true
+    });
+    /**
+     * Tags that are being used more frequently within the past week.
+     * @param params Parameters
+     * @return Array of Tag with History
+     * @see https://docs.joinmastodon.org/methods/instance/trends/
+     */
+    TrendRepository.prototype.fetchTags = function (params) {
+        return this.http.get('/api/v1/trends/tags', params);
+    };
+    __decorate([
+        version({ since: '3.5.0' })
+    ], TrendRepository.prototype, "iterateStatuses", null);
+    __decorate([
+        version({ since: '3.5.0' })
+    ], TrendRepository.prototype, "iterateLinks", null);
+    __decorate([
+        version({ since: '3.0.0' })
+    ], TrendRepository.prototype, "fetchTags", null);
+    return TrendRepository;
+}());
+
+var EmailRepository = /** @class */ (function () {
+    function EmailRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    EmailRepository.prototype.createConfirmation = function (params) {
+        return this.http.post('/api/v1/email/confirmations', params);
+    };
+    return EmailRepository;
+}());
+
+var TagRepository = /** @class */ (function () {
+    function TagRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * Show a hashtag and its associated information
+     * @param id The name of the hashtag
+     * @return Tag
+     */
+    TagRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/tags/".concat(id));
+    };
+    /**
+     * Follow a hashtag. Posts containing a followed hashtag will be inserted into your home timeline.
+     * @param id The name of the hashtag
+     * @return Tag
+     */
+    TagRepository.prototype.follow = function (id) {
+        return this.http.post("/api/v1/tags/".concat(id, "/follow"));
+    };
+    /**
+     * Unfollow a hashtag. Posts containing a followed hashtag will no longer be inserted into your home timeline.
+     * @param id The name of the hashtag
+     * @return Tag
+     */
+    TagRepository.prototype.unfollow = function (id) {
+        return this.http.post("/api/v1/tags/".concat(id, "/unfollow"));
+    };
+    __decorate([
+        version({ since: '4.0.0' })
+    ], TagRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], TagRepository.prototype, "follow", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], TagRepository.prototype, "unfollow", null);
+    return TagRepository;
+}());
+
+var FollowedTagRepository = /** @class */ (function (_super) {
+    __extends(FollowedTagRepository, _super);
+    function FollowedTagRepository(http, version, config) {
+        var _this = _super.call(this) || this;
+        _this.http = http;
+        _this.version = version;
+        _this.config = config;
+        return _this;
+    }
+    FollowedTagRepository.prototype.iterate = function (params) {
+        return new Paginator(this.http, '/api/v1/followed_tags', params);
+    };
+    __decorate([
+        version({ since: '4.0.0' })
+    ], FollowedTagRepository.prototype, "iterate", null);
+    return FollowedTagRepository;
+}(IterableRepository));
+
+var ReportRepository = /** @class */ (function () {
+    function ReportRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * View all reports. Pagination may be done with HTTP Link header in the response.
+     * @param params Parameters
+     * @return Array of AdminReport
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    ReportRepository.prototype.fetchAll = function (params) {
+        return this.http.get('/api/v1/admin/reports', params);
+    };
+    /**
+     * View information about the report with the given ID.
+     * @param id ID of the report
+     * @return AdminReport
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    ReportRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/admin/reports/".concat(id));
+    };
+    /**
+     * Claim the handling of this report to yourself.
+     * @param id ID of the report
+     * @return AdminReport
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    ReportRepository.prototype.assignToSelf = function (id) {
+        return this.http.post("/api/v1/admin/reports/".concat(id, "/assign_to_self"));
+    };
+    /**
+     * Unassign a report so that someone else can claim it.
+     * @param id ID of the report
+     * @return AdminReport
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    ReportRepository.prototype.unassign = function (id) {
+        return this.http.post("/api/v1/admin/reports/".concat(id, "/unassign"));
+    };
+    /**
+     * Mark a report as resolved with no further action taken.
+     * @param id ID of the report
+     * @return AdminReport
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    ReportRepository.prototype.resolve = function (id) {
+        return this.http.post("/api/v1/admin/reports/".concat(id, "/resolve"));
+    };
+    /**
+     * Reopen a currently closed report.
+     * @param id ID of the report
+     * @return AdminReport
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    ReportRepository.prototype.reopen = function (id) {
+        return this.http.post("/api/v1/admin/reports/".concat(id, "/reopen"));
+    };
+    __decorate([
+        version({ since: '2.9.1' })
+    ], ReportRepository.prototype, "fetchAll", null);
+    __decorate([
+        version({ since: '2.9.1' })
+    ], ReportRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '2.9.1' })
+    ], ReportRepository.prototype, "assignToSelf", null);
+    __decorate([
+        version({ since: '2.9.1' })
+    ], ReportRepository.prototype, "unassign", null);
+    __decorate([
+        version({ since: '2.9.1' })
+    ], ReportRepository.prototype, "resolve", null);
+    __decorate([
+        version({ since: '2.9.1' })
+    ], ReportRepository.prototype, "reopen", null);
+    return ReportRepository;
+}());
+
+var AccountRepository = /** @class */ (function () {
+    function AccountRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * View accounts matching certain criteria for filtering, up to 100 at a time.
+     * Pagination may be done with the HTTP Link header in the response.
+     * @param params Parameters
+     * @return Array of AdminAccount
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    AccountRepository.prototype.fetchAll = function (params) {
+        return this.http.get('/api/v1/admin/accounts', params);
+    };
+    /**
+     * View admin-level information about the given account.
+     * @param id ID of the account
+     * @return AdminAccount
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    AccountRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/admin/accounts/".concat(id));
+    };
+    /**
+     * Perform an action against an account and log this action in the moderation history.
+     * @param id g ID of the account
+     * @param params Params
+     * @return Account
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    AccountRepository.prototype.createAction = function (id, params) {
+        return this.http.post("/api/v1/admin/accounts/".concat(id, "/action"), params);
+    };
+    /**
+     * Approve the given local account if it is currently pending approval.
+     * @param id ID of the account
+     * @return AdminAccount
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    AccountRepository.prototype.approve = function (id) {
+        return this.http.post("/api/v1/admin/accounts/".concat(id, "/approve"));
+    };
+    /**
+     * Reject the given local account if it is currently pending approval.
+     * @param id ID of the account
+     * @return AdminAccount
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    AccountRepository.prototype.reject = function (id) {
+        return this.http.post("/api/v1/admin/accounts/".concat(id, "/reject"));
+    };
+    /**
+     * Re-enable a local account whose login is currently disabled.
+     * @param id ID of the account
+     * @return AdminAccount
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    AccountRepository.prototype.enable = function (id) {
+        return this.http.post("/api/v1/admin/accounts/".concat(id, "/enable"));
+    };
+    /**
+     * Unsilence a currently silenced account.
+     * @param id ID of the account
+     * @return AdminAccount
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    AccountRepository.prototype.unsilence = function (id) {
+        return this.http.post("/api/v1/admin/accounts/".concat(id, "/unsilence"));
+    };
+    /**
+     * Unsuspend a currently suspended account.
+     * @param id ID of the account
+     * @return AdminAccount
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    AccountRepository.prototype.unsuspend = function (id) {
+        return this.http.post("/api/v1/admin/accounts/".concat(id, "/unsuspend"));
+    };
+    __decorate([
+        version({ since: '2.9.1' })
+    ], AccountRepository.prototype, "fetchAll", null);
+    __decorate([
+        version({ since: '2.9.1' })
+    ], AccountRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '2.9.1' })
+    ], AccountRepository.prototype, "createAction", null);
+    __decorate([
+        version({ since: '2.9.1' })
+    ], AccountRepository.prototype, "approve", null);
+    __decorate([
+        version({ since: '2.9.1' })
+    ], AccountRepository.prototype, "reject", null);
+    __decorate([
+        version({ since: '2.9.1' })
+    ], AccountRepository.prototype, "enable", null);
+    __decorate([
+        version({ since: '2.9.1' })
+    ], AccountRepository.prototype, "unsilence", null);
+    __decorate([
+        version({ since: '2.9.1' })
+    ], AccountRepository.prototype, "unsuspend", null);
+    return AccountRepository;
+}());
+
+var DomainBlockRepository = /** @class */ (function () {
+    function DomainBlockRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     *
+     * @param params Parameters
+     * @return Array of DomainBlocks
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    DomainBlockRepository.prototype.fetchAll = function (params) {
+        return this.http.get('/api/v1/admin/domain_blocks', params);
+    };
+    /**
+     * Show information about a single blocked domain.
+     * @param id ID of the account
+     * @return DomainBlocks
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    DomainBlockRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/admin/domain_blocks/".concat(id));
+    };
+    /**
+     * Add a domain to the list of domains blocked from federating.
+     * @param params Parameters
+     * @return DomainBlocks
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    DomainBlockRepository.prototype.create = function (params) {
+        return this.http.post('/api/v1/admin/domain_blocks', params);
+    };
+    /**
+     * Change parameters for an existing domain block.
+     * @param id id of domain
+     * @param params Parameters
+     * @return DomainBlocks
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    DomainBlockRepository.prototype.update = function (id, params) {
+        return this.http.put("/api/v1/admin/domain_blocks/".concat(id), params);
+    };
+    /**
+     * Lift a block against a domain.
+     * @param id id of domain
+     * @return DomainBlocks
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    DomainBlockRepository.prototype.remove = function (id) {
+        return this.http.delete("/api/v1/admin/domain_blocks/".concat(id));
+    };
+    __decorate([
+        version({ since: '4.0.0' })
+    ], DomainBlockRepository.prototype, "fetchAll", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], DomainBlockRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], DomainBlockRepository.prototype, "create", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], DomainBlockRepository.prototype, "update", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], DomainBlockRepository.prototype, "remove", null);
+    return DomainBlockRepository;
+}());
+
+var DomainAllowRepository = /** @class */ (function () {
+    function DomainAllowRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * Show information about all allowed domains
+     * @param params Parameters
+     * @return Array of DomainAllow
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    DomainAllowRepository.prototype.fetchAll = function (params) {
+        return this.http.get('/api/v1/admin/domain_allows', params);
+    };
+    /**
+     * Show information about a single allowed domain
+     * @param id id of the domain
+     * @return DomainAllow
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    DomainAllowRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/admin/domain_allows/".concat(id));
+    };
+    /**
+     * Add a domain to the list of domains allowed to federate,
+     * to be used when the instance is in allow-list federation mode.
+     * @param params parameters
+     * @return DomainAllow
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    DomainAllowRepository.prototype.create = function (params) {
+        return this.http.post('/api/v1/admin/domain_allows', params);
+    };
+    /**
+     * Delete a domain from the allowed domains list.
+     * @param id id of domain
+     * @return DomainAllow
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    DomainAllowRepository.prototype.remove = function (id) {
+        return this.http.delete("/api/v1/admin/domain_allows/".concat(id));
+    };
+    __decorate([
+        version({ since: '4.0.0' })
+    ], DomainAllowRepository.prototype, "fetchAll", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], DomainAllowRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], DomainAllowRepository.prototype, "create", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], DomainAllowRepository.prototype, "remove", null);
+    return DomainAllowRepository;
+}());
+
+var EmailDomainBlockRepository = /** @class */ (function () {
+    function EmailDomainBlockRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * Show information about all email domains blocked from signing up.
+     * @param params Parameters
+     * @return Array of EmailDomainBlock
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    EmailDomainBlockRepository.prototype.fetchAll = function (params) {
+        return this.http.get('/api/v1/admin/email_domain_blocks ', params);
+    };
+    /**
+     * Show information about a single email domain that is blocked from sign-ups.
+     * @param id id of the DomainBlock
+     * @return Array of EmailDomainBlock
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    EmailDomainBlockRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/admin/email_domain_blocks/".concat(id));
+    };
+    /**
+     * Add a domain to the list of email domains blocked from sign-ups.
+     * @param params Parameters
+     * @return Array of EmailDomainBlock
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    EmailDomainBlockRepository.prototype.create = function (params) {
+        return this.http.post('/api/v1/admin/email_domain_blocks ', params);
+    };
+    /**
+     * Lift a block against an email domain.
+     * @param id id of domain
+     * @return null
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    EmailDomainBlockRepository.prototype.remove = function (id) {
+        return this.http.delete("/api/v1/admin/email_domain_blocks/".concat(id));
+    };
+    __decorate([
+        version({ since: '4.0.0' })
+    ], EmailDomainBlockRepository.prototype, "fetchAll", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], EmailDomainBlockRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], EmailDomainBlockRepository.prototype, "create", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], EmailDomainBlockRepository.prototype, "remove", null);
+    return EmailDomainBlockRepository;
+}());
+
+var IpBlockRepository = /** @class */ (function () {
+    function IpBlockRepository(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+    }
+    /**
+     * Show information about all blocked IP ranges.
+     * @param params Parameters
+     * @return Array of Ip Block
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    IpBlockRepository.prototype.fetchAll = function (params) {
+        return this.http.get('/api/v1/admin/ip_blocks', params);
+    };
+    /**
+     * Show information about all blocked IP ranges.
+     * @param id id of the Ip blocked
+     * @return object of Ip Block
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    IpBlockRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/admin/ip_blocks/".concat(id));
+    };
+    /**
+     * Add an IP address range to the list of IP blocks.
+     * @param params Parameters
+     * @return object of Ip Block
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    IpBlockRepository.prototype.create = function (params) {
+        return this.http.post('/api/v1/admin/ip_blocks', params);
+    };
+    /**
+     * Change parameters for an existing IP block.
+     * @param params Parameters
+     * @return object of Ip Block
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    IpBlockRepository.prototype.update = function (params) {
+        return this.http.put('/api/v1/admin/ip_blocks', params);
+    };
+    /**
+     * Lift a block against an IP range.
+     * @param id id of ip block
+     * @return null
+     * @see https://docs.joinmastodon.org/methods/admin/
+     */
+    IpBlockRepository.prototype.remove = function (id) {
+        return this.http.delete("/api/v1/admin/ip_blocks/".concat(id));
+    };
+    __decorate([
+        version({ since: '4.0.0' })
+    ], IpBlockRepository.prototype, "fetchAll", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], IpBlockRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], IpBlockRepository.prototype, "create", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], IpBlockRepository.prototype, "update", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], IpBlockRepository.prototype, "remove", null);
+    return IpBlockRepository;
+}());
+
+var CanonicalEmailBlockRepository = /** @class */ (function (_super) {
+    __extends(CanonicalEmailBlockRepository, _super);
+    function CanonicalEmailBlockRepository(http, version, config) {
+        var _this = _super.call(this) || this;
+        _this.http = http;
+        _this.version = version;
+        _this.config = config;
+        return _this;
+    }
+    /**
+     * List all canonical email blocks.
+     * @param params Parameters
+     * @return Array of CanonicalEmailBlock
+     * @see https://docs.joinmastodon.org/methods/admin/canonical_email_blocks/
+     */
+    CanonicalEmailBlockRepository.prototype.iterate = function (params) {
+        return new Paginator(this.http, '/api/v1/admin/canonical_email_blocks', params);
+    };
+    /**
+     * Show a single canonical email block
+     * @param id id of the canonical email
+     * @return CanonicalEmailBlock
+     * @see https://docs.joinmastodon.org/methods/admin/canonical_email_blocks
+     */
+    CanonicalEmailBlockRepository.prototype.fetch = function (id) {
+        return this.http.get("/api/v1/admin/canonical_email_blocks/".concat(id));
+    };
+    /**
+     * Canonicalize and hash an email address.
+     * @param params Parameters
+     * @return Array of CanonicalEmailBlock
+     * @see https://docs.joinmastodon.org/methods/admin/canonical_email_blocks
+     */
+    CanonicalEmailBlockRepository.prototype.test = function (params) {
+        return this.http.post('/api/v1/admin/canonical_email_blocks/test', params);
+    };
+    /**
+     * Block a canonical email.
+     * @param params Parameters
+     * @return CanonicalEmailBlock
+     * @see https://docs.joinmastodon.org/methods/admin/canonical_email_blocks
+     */
+    CanonicalEmailBlockRepository.prototype.create = function (params) {
+        return this.http.post('/api/v1/admin/canonical_email_blocks', params);
+    };
+    /**
+     * Lift a block a canonical email.
+     * @param id id of canonical email
+     * @return null
+     * @see https://docs.joinmastodon.org/methods/admin/canonical_email_blocks
+     */
+    CanonicalEmailBlockRepository.prototype.remove = function (id) {
+        return this.http.delete("/api/v1/admin/canonical_email_blocks/".concat(id));
+    };
+    __decorate([
+        version({ since: '4.0.0' })
+    ], CanonicalEmailBlockRepository.prototype, "iterate", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], CanonicalEmailBlockRepository.prototype, "fetch", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], CanonicalEmailBlockRepository.prototype, "test", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], CanonicalEmailBlockRepository.prototype, "create", null);
+    __decorate([
+        version({ since: '4.0.0' })
+    ], CanonicalEmailBlockRepository.prototype, "remove", null);
+    return CanonicalEmailBlockRepository;
+}(IterableRepository));
+
+var index$1 = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    ReportRepository: ReportRepository,
+    AccountRepository: AccountRepository,
+    DomainBlockRepository: DomainBlockRepository,
+    DomainAllowRepository: DomainAllowRepository,
+    EmailDomainBlockRepository: EmailDomainBlockRepository,
+    IpBlockRepository: IpBlockRepository,
+    CanonicalEmailBlockRepository: CanonicalEmailBlockRepository
+});
+
+var MastoAdminClient = /** @class */ (function () {
+    function MastoAdminClient(http, version, config) {
+        this.http = http;
+        this.version = version;
+        this.config = config;
+        this.account = new AccountRepository(this.http, this.version, this.config);
+        this.report = new ReportRepository(this.http, this.version, this.config);
+        this.domainBlocks = new DomainBlockRepository(this.http, this.version, this.config);
+        this.domainAllows = new DomainAllowRepository(this.http, this.version, this.config);
+        this.domainEmailBlocks = new EmailDomainBlockRepository(this.http, this.version, this.config);
+        this.ipBlocks = new IpBlockRepository(this.http, this.version, this.config);
+        this.canonicalEmailBlocks =
+            new CanonicalEmailBlockRepository(this.http, this.version, this.config);
+    }
+    return MastoAdminClient;
+}());
+/**
+ * @deprecated This alias will be removed in v5.0.0
+ */
+var AdminFacadeRepositories = MastoAdminClient;
+
+var MastoClient = /** @class */ (function () {
+    function MastoClient(http, ws, version, config) {
+        this.http = http;
+        this.ws = ws;
+        this.version = version;
+        this.config = config;
+        this.admin = new MastoAdminClient(this.http, this.version, this.config);
+        this.stream = new StreamRepository(this.ws, this.version, this.config);
+        this.accounts = new AccountRepository$1(this.http, this.version, this.config);
+        this.announcements = new AnnouncementRepository(this.http, this.version, this.config);
+        this.apps = new AppRepository(this.http, this.version, this.config);
+        this.blocks = new BlockRepository(this.http, this.version, this.config);
+        this.bookmarks = new BookmarkRepository(this.http, this.version, this.config);
+        this.conversations = new ConversationRepository(this.http, this.version, this.config);
+        this.customEmojis = new CustomEmojiRepository(this.http, this.version, this.config);
+        this.directory = new DirectoryRepository(this.http, this.version, this.config);
+        this.domainBlocks = new DomainBlockRepository$1(this.http, this.version, this.config);
+        this.endorsements = new EndorsementRepository(this.http, this.version, this.config);
+        this.favourites = new FavouriteRepository(this.http, this.version, this.config);
+        this.featuredTags = new FeaturedTagRepository(this.http, this.version, this.config);
+        this.filters = new FilterRepository(this.http, this.version, this.config);
+        this.followRequests = new FollowRequestRepository(this.http, this.version, this.config);
+        this.instances = new InstanceRepository(this.http, this.version, this.config);
+        this.lists = new ListRepository(this.http, this.version, this.config);
+        this.markers = new MarkerRepository(this.http, this.version, this.config);
+        this.mediaAttachments = new MediaAttachmentRepository(this.http, this.version, this.config);
+        this.mutes = new MuteRepository(this.http, this.version, this.config);
+        this.notifications = new NotificationsRepository(this.http, this.version, this.config);
+        this.poll = new PollRepository(this.http, this.version, this.config);
+        this.preferences = new PreferenceRepository(this.http, this.version, this.config);
+        this.pushSubscriptions = new PushSubscriptionsRepository(this.http, this.version, this.config);
+        this.reports = new ReportRepository$1(this.http, this.version, this.config);
+        this.scheduledStatuses = new ScheduledStatusesRepository(this.http, this.version, this.config);
+        this.statuses = new StatusRepository(this.http, this.version, this.config);
+        this.suggestions = new SuggestionRepository(this.http, this.version, this.config);
+        this.timelines = new TimelinesRepository(this.http, this.version, this.config);
+        this.trends = new TrendRepository(this.http, this.version, this.config);
+        this.email = new EmailRepository(this.http, this.version, this.config);
+        this.tags = new TagRepository(this.http, this.version, this.config);
+        this.followedTags = new FollowedTagRepository(this.http, this.version, this.config);
+    }
+    /**
+     * Search results
+     * @param params Parameters
+     * @return Results
+     * @see https://docs.joinmastodon.org/methods/search/
+     */
+    MastoClient.prototype.search = function (params) {
+        return new Paginator(this.http, "/api/v2/search", params);
+    };
+    __decorate([
+        version({ since: '2.4.1' })
+    ], MastoClient.prototype, "search", null);
+    return MastoClient;
+}());
+/**
+ * @deprecated This type alias will be removed in v5.x
+ */
+var FacadeRepositories = MastoClient;
+
+var BaseHttp = /** @class */ (function () {
+    function BaseHttp() {
+    }
+    BaseHttp.prototype.createHeader = function (header) {
+        if (header === void 0) { header = {}; }
+        var headers = __assign({ 'Content-Type': 'application/json' }, header);
+        if (this.config.accessToken) {
+            headers['Authorization'] = "Bearer ".concat(this.config.accessToken);
+        }
+        return headers;
+    };
+    BaseHttp.prototype.resolveUrl = function (path, params) {
+        if (params === void 0) { params = {}; }
+        var searchParams = this.serializer.serializeQueryString(params);
+        return "".concat(this.config.url).concat(path).concat(searchParams !== '' ? "?".concat(searchParams) : '');
+    };
+    BaseHttp.prototype.getContentType = function (headers) {
+        var _a;
+        var contentType = (_a = headers['Content-Type']) !== null && _a !== void 0 ? _a : headers['content-type'];
+        if (typeof contentType !== 'string') {
+            return;
+        }
+        return contentType.replace(/\s*;.*$/, '');
+    };
+    BaseHttp.prototype.get = function (url, data, init) {
+        if (init === void 0) { init = {}; }
+        return this.request(__assign({ method: 'GET', url: url, params: data }, init)).then(function (response) { return response.data; });
+    };
+    BaseHttp.prototype.post = function (url, data, init) {
+        if (init === void 0) { init = {}; }
+        return this.request(__assign({ method: 'POST', url: url, data: data }, init)).then(function (response) { return response.data; });
+    };
+    BaseHttp.prototype.delete = function (url, data, init) {
+        if (init === void 0) { init = {}; }
+        return this.request(__assign({ method: 'DELETE', url: url, data: data }, init)).then(function (response) { return response.data; });
+    };
+    BaseHttp.prototype.put = function (url, data, init) {
+        if (init === void 0) { init = {}; }
+        return this.request(__assign({ method: 'PUT', url: url, data: data }, init)).then(function (response) { return response.data; });
+    };
+    BaseHttp.prototype.patch = function (url, data, init) {
+        if (init === void 0) { init = {}; }
+        return this.request(__assign({ method: 'PATCH', url: url, data: data }, init)).then(function (response) { return response.data; });
+    };
+    return BaseHttp;
+}());
+
+var HttpAxiosImpl = /** @class */ (function (_super) {
+    __extends(HttpAxiosImpl, _super);
+    function HttpAxiosImpl(config, serializer) {
+        var _this = _super.call(this) || this;
+        _this.config = config;
+        _this.serializer = serializer;
+        _this.axios = axios.create({
+            baseURL: config.url,
+            headers: _this.createHeader(config.headers),
+            proxy: config.proxy,
+            timeout: config.timeout,
+            transformRequest: function (data, headers) {
+                if (headers == undefined) {
+                    throw new MastoError('headers is null');
+                }
+                var result = _this.serializer.serialize(headers['Content-Type'], data);
+                // In Node.js, axios doesn't set boundary data to the header
+                // so set it manually by using getHeaders of form-data node.js package
+                // https://github.com/form-data/form-data#headers-getheaders-headers-userheaders-
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                if (typeof (result === null || result === void 0 ? void 0 : result.getHeaders) === 'function') {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    headers['Content-Type'] = result.getHeaders()['content-type'];
+                }
+                return result;
+            },
+            transformResponse: function (data, headers) {
+                if (headers == undefined) {
+                    throw new MastoError('headers is null');
+                }
+                var contentType = _this.getContentType(headers);
+                if (contentType == undefined) {
+                    throw new MastoError('Content-Type is not defined');
+                }
+                return _this.serializer.deserialize(contentType, data);
+            },
+            paramsSerializer: {
+                serialize: function (params) { return _this.serializer.serializeQueryString(params); },
+            },
+        });
+        return _this;
+    }
+    HttpAxiosImpl.prototype.request = function (params) {
+        var _a, _b, _c, _d, _e, _f, _g, _h;
+        return __awaiter(this, void 0, void 0, function () {
+            var config, response, error_1, data;
+            return __generator(this, function (_j) {
+                switch (_j.label) {
+                    case 0:
+                        _j.trys.push([0, 2, , 3]);
+                        config = {};
+                        config.url = params.url;
+                        config.method = params.method;
+                        if (params.headers) {
+                            config.headers = params.headers;
+                        }
+                        if (params.params) {
+                            config.params = params.params;
+                        }
+                        if (params.data) {
+                            config.data = params.data;
+                        }
+                        return [4 /*yield*/, this.axios.request(config)];
+                    case 1:
+                        response = _j.sent();
+                        return [2 /*return*/, {
+                                headers: response.headers,
+                                data: response.data,
+                            }];
+                    case 2:
+                        error_1 = _j.sent();
+                        // eslint-disable-next-line import/no-named-as-default-member
+                        if (!axios.isAxiosError(error_1)) {
+                            throw error_1;
+                        }
+                        data = (_a = error_1.response) === null || _a === void 0 ? void 0 : _a.data;
+                        throw createError({
+                            cause: error_1,
+                            statusCode: (_b = error_1 === null || error_1 === void 0 ? void 0 : error_1.response) === null || _b === void 0 ? void 0 : _b.status,
+                            message: data === null || data === void 0 ? void 0 : data.error,
+                            details: data === null || data === void 0 ? void 0 : data.errorDescription,
+                            description: data === null || data === void 0 ? void 0 : data.details,
+                            limit: (_d = (_c = error_1 === null || error_1 === void 0 ? void 0 : error_1.response) === null || _c === void 0 ? void 0 : _c.headers) === null || _d === void 0 ? void 0 : _d['X-RateLimit-Limit'],
+                            remaining: (_f = (_e = error_1 === null || error_1 === void 0 ? void 0 : error_1.response) === null || _e === void 0 ? void 0 : _e.headers) === null || _f === void 0 ? void 0 : _f['X-RateLimit-Remaining'],
+                            reset: (_h = (_g = error_1 === null || error_1 === void 0 ? void 0 : error_1.response) === null || _g === void 0 ? void 0 : _g.headers) === null || _h === void 0 ? void 0 : _h['X-RateLimit-Reset'],
+                        });
+                    case 3: return [2 /*return*/];
+                }
+            });
+        });
+    };
+    return HttpAxiosImpl;
+}(BaseHttp));
+
+var isObject = function (x) {
+    return typeof x === 'object' && x !== null && x.constructor === Object;
+};
+
+var flattenObject = function (object, parent) {
+    var _a;
+    if (parent === void 0) { parent = ''; }
+    if (Array.isArray(object)) {
+        return object
+            .map(function (value, i) {
+            return flattenObject(value, parent !== '' ? "".concat(parent, "[").concat(i, "]") : i.toString());
+        })
+            .reduce(function (prev, curr) { return Object.assign(prev, curr); }, {});
+    }
+    if (isObject(object)) {
+        return Object.entries(object)
+            .map(function (_a) {
+            var key = _a[0], value = _a[1];
+            return flattenObject(value, parent !== '' ? "".concat(parent, "[").concat(key, "]") : key);
+        })
+            .reduce(function (prev, curr) { return Object.assign(prev, curr); }, {});
+    }
+    // Unit of the monoid is always an object
+    return parent !== ''
+        ? (_a = {}, _a[parent] = object, _a) : object;
+};
+
+/**
+ * Encodes URI in Rails format
+ */
+var stringify = function (object) {
+    if (!isObject(object)) {
+        return '';
+    }
+    var values = Object.entries(object)
+        .reduce(function (prev, _a) {
+        var k = _a[0], v = _a[1];
+        if (Array.isArray(v)) {
+            var xs = v.map(function (x) { return "".concat(k, "[]=").concat(encodeURIComponent(x)); });
+            return __spreadArray(__spreadArray([], prev, true), xs, true);
+        }
+        if (v == undefined) {
+            return prev;
+        }
+        if (typeof v === 'string' ||
+            typeof v === 'number' ||
+            typeof v === 'boolean') {
+            return __spreadArray(__spreadArray([], prev, true), ["".concat(k, "=").concat(encodeURIComponent(v))], false);
+        }
+        throw new TypeError('Encoding nested object is not supported');
+    }, [])
+        .join('&');
+    return values;
+};
+var railsQueryString = { stringify: stringify };
+
+var transformKeys = function (data, transform) {
+    if (Array.isArray(data)) {
+        return data.map(function (value) { return transformKeys(value, transform); });
+    }
+    if (isObject(data)) {
+        return Object.fromEntries(Object.entries(data).map(function (_a) {
+            var key = _a[0], value = _a[1];
+            return [
+                transform(key),
+                transformKeys(value, transform),
+            ];
+        }));
+    }
+    return data;
+};
+
+var SerializerNativeImpl = /** @class */ (function () {
+    function SerializerNativeImpl() {
+    }
+    SerializerNativeImpl.prototype.serialize = function (type, rawData) {
+        if (rawData == undefined)
+            return;
+        var data = transformKeys(rawData, changeCase.snakeCase);
+        switch (type) {
+            case 'application/json': {
+                return JSON.stringify(data);
+            }
+            case 'multipart/form-data': {
+                var formData = new FormData();
+                for (var _i = 0, _a = Object.entries(flattenObject(data)); _i < _a.length; _i++) {
+                    var _b = _a[_i], key = _b[0], value = _b[1];
+                    formData.append(key, value);
+                }
+                return formData;
+            }
+            default: {
+                return;
+            }
+        }
+    };
+    SerializerNativeImpl.prototype.serializeQueryString = function (rawData) {
+        var data = transformKeys(rawData, changeCase.snakeCase);
+        return railsQueryString.stringify(data);
+    };
+    SerializerNativeImpl.prototype.deserialize = function (type, data) {
+        switch (type) {
+            case 'application/json': {
+                try {
+                    return transformKeys(JSON.parse(data), changeCase.camelCase);
+                }
+                catch (_a) {
+                    return undefined;
+                }
+            }
+            default: {
+                throw new MastoDeserializeError("Unknown content type ".concat(type, " returned from the server."), type, data);
+            }
+        }
+    };
+    return SerializerNativeImpl;
+}());
+
+var BaseWs = /** @class */ (function () {
+    function BaseWs() {
+    }
+    BaseWs.prototype.supportsSecureToken = function () {
+        if (this.config.disableVersionCheck) {
+            return true;
+        }
+        // Since v2.8.4, it is supported to pass access token with`Sec-Websocket-Protocol`
+        // https://github.com/tootsuite/mastodon/pull/10818
+        return (this.version &&
+            this.baseUrl.startsWith('wss:') &&
+            semver.gte(this.version, '2.8.4', { loose: true }));
+    };
+    BaseWs.prototype.resolveUrl = function (path, params) {
+        if (params === void 0) { params = {}; }
+        if (!this.supportsSecureToken()) {
+            params.accessToken = this.config.accessToken;
+        }
+        var query = this.serializer.serializeQueryString(params);
+        return this.baseUrl + path + (query !== '' ? "?".concat(query) : '');
+    };
+    BaseWs.prototype.createProtocols = function (protocols) {
+        if (protocols === void 0) { protocols = []; }
+        return this.supportsSecureToken() && this.config.accessToken != undefined
+            ? __spreadArray([this.config.accessToken], protocols, true) : protocols;
+    };
+    return BaseWs;
+}());
+
+/**
+ * Mastodon streaming api wrapper
+ */
+var WsEventsNativeImpl = /** @class */ (function (_super) {
+    __extends(WsEventsNativeImpl, _super);
+    function WsEventsNativeImpl(ws, serializer) {
+        var _this = _super.call(this) || this;
+        _this.ws = ws;
+        _this.serializer = serializer;
+        /**
+         * Parse JSON data and emit it as an event
+         * @param message Websocket message
+         */
+        _this.handleMessage = function (_a) {
+            var data = _a.data;
+            var _b = _this.serializer.deserialize('application/json', data), event = _b.event, payload = _b.payload;
+            // https://github.com/neet/masto.js/issues/750
+            if (event === 'delete') {
+                return void _this.emit(event, payload);
+            }
+            var args = [];
+            try {
+                args.push(_this.serializer.deserialize('application/json', payload));
+            }
+            catch (_c) {
+                args = [];
+            }
+            _this.emit.apply(_this, __spreadArray([event], args, false));
+        };
+        return _this;
+    }
+    /**
+     * Connect to the websocket endpoint
+     * @param url URL of the websocket endpoint
+     * @param protocols Subprotocol(s) for `Sec-Websocket-Protocol`
+     * @param params URL parameters
+     */
+    WsEventsNativeImpl.connect = function (url, serializer, protocols) {
+        return new Promise(function (resolve, reject) {
+            var ws = new WebSocket(url, protocols);
+            var instance = new WsEventsNativeImpl(ws, serializer);
+            ws.addEventListener('message', instance.handleMessage);
+            ws.addEventListener('error', reject);
+            ws.addEventListener('open', function () { return resolve(instance); });
+        });
+    };
+    /**
+     * Disconnect from the websocket endpoint
+     */
+    WsEventsNativeImpl.prototype.disconnect = function () {
+        if (!this.ws)
+            return;
+        this.ws.close();
+    };
+    return WsEventsNativeImpl;
+}(EventEmitter));
+var WsNativeImpl = /** @class */ (function (_super) {
+    __extends(WsNativeImpl, _super);
+    function WsNativeImpl(baseUrl, version, config, serializer) {
+        var _this = _super.call(this) || this;
+        _this.baseUrl = baseUrl;
+        _this.version = version;
+        _this.config = config;
+        _this.serializer = serializer;
+        return _this;
+    }
+    WsNativeImpl.prototype.stream = function (path, params) {
+        if (params === void 0) { params = {}; }
+        return WsEventsNativeImpl.connect(this.resolveUrl(path, params), this.serializer, this.createProtocols());
+    };
+    return WsNativeImpl;
+}(BaseWs));
+
+var index = /*#__PURE__*/Object.freeze({
+    __proto__: null
+});
+
+var login = function (config) { return __awaiter(void 0, void 0, void 0, function () {
+    var serializer, http, instance, ws;
+    return __generator(this, function (_a) {
+        switch (_a.label) {
+            case 0:
+                serializer = new SerializerNativeImpl();
+                http = new HttpAxiosImpl(config, serializer);
+                return [4 /*yield*/, new InstanceRepository(http, '1.0.0', config).fetch()];
+            case 1:
+                instance = _a.sent();
+                ws = new WsNativeImpl(instance.urls.streamingApi, instance.version, config, serializer);
+                return [2 /*return*/, new MastoClient(http, ws, instance.version, config)];
+        }
+    });
+}); };
+
+exports.AccountRepository = AccountRepository$1;
+exports.Admin = index;
+exports.AdminFacadeRepositories = AdminFacadeRepositories;
+exports.AdminRepositories = index$1;
+exports.AnnouncementRepository = AnnouncementRepository;
+exports.AppRepository = AppRepository;
+exports.BaseHttp = BaseHttp;
+exports.BlockRepository = BlockRepository;
+exports.BookmarkRepository = BookmarkRepository;
+exports.ConversationRepository = ConversationRepository;
+exports.CustomEmojiRepository = CustomEmojiRepository;
+exports.DirectoryRepository = DirectoryRepository;
+exports.DomainBlockRepository = DomainBlockRepository$1;
+exports.EmailRepository = EmailRepository;
+exports.EndorsementRepository = EndorsementRepository;
+exports.FacadeRepositories = FacadeRepositories;
+exports.FavouriteRepository = FavouriteRepository;
+exports.FeaturedTagRepository = FeaturedTagRepository;
+exports.FilterRepository = FilterRepository;
+exports.FollowRequestRepository = FollowRequestRepository;
+exports.FollowedTagRepository = FollowedTagRepository;
+exports.HttpAxiosImpl = HttpAxiosImpl;
+exports.InstanceRepository = InstanceRepository;
+exports.IterableRepository = IterableRepository;
+exports.ListRepository = ListRepository;
+exports.MarkerRepository = MarkerRepository;
+exports.MastoAdminClient = MastoAdminClient;
+exports.MastoClient = MastoClient;
+exports.MastoConflictError = MastoConflictError;
+exports.MastoDeserializeError = MastoDeserializeError;
+exports.MastoError = MastoError;
+exports.MastoForbiddenError = MastoForbiddenError;
+exports.MastoGoneError = MastoGoneError;
+exports.MastoHttpConflictError = MastoHttpConflictError;
+exports.MastoHttpError = MastoHttpError;
+exports.MastoHttpForbiddenError = MastoHttpForbiddenError;
+exports.MastoHttpGoneError = MastoHttpGoneError;
+exports.MastoHttpNotFoundError = MastoHttpNotFoundError;
+exports.MastoHttpRateLimitError = MastoHttpRateLimitError;
+exports.MastoHttpUnauthorizedError = MastoHttpUnauthorizedError;
+exports.MastoHttpUnprocessableEntityError = MastoHttpUnprocessableEntityError;
+exports.MastoNotFoundError = MastoNotFoundError;
+exports.MastoRateLimitError = MastoRateLimitError;
+exports.MastoTimeoutError = MastoTimeoutError;
+exports.MastoUnauthorizedError = MastoUnauthorizedError;
+exports.MastoUnprocessableEntityError = MastoUnprocessableEntityError;
+exports.MediaAttachmentRepository = MediaAttachmentRepository;
+exports.MuteRepository = MuteRepository;
+exports.NotificationsRepository = NotificationsRepository;
+exports.Paginator = Paginator;
+exports.PollRepository = PollRepository;
+exports.PreferenceRepository = PreferenceRepository;
+exports.PushSubscriptionsRepository = PushSubscriptionsRepository;
+exports.ReportRepository = ReportRepository$1;
+exports.ScheduledStatusesRepository = ScheduledStatusesRepository;
+exports.SerializerNativeImpl = SerializerNativeImpl;
+exports.StatusRepository = StatusRepository;
+exports.StreamRepository = StreamRepository;
+exports.SuggestionRepository = SuggestionRepository;
+exports.TagRepository = TagRepository;
+exports.TimelinesRepository = TimelinesRepository;
+exports.TrendRepository = TrendRepository;
+exports.WsEventsNativeImpl = WsEventsNativeImpl;
+exports.WsNativeImpl = WsNativeImpl;
+exports.createError = createError;
+exports.deprecated = deprecated;
+exports.login = login;
+exports.version = version;
+
 
 /***/ }),
 
@@ -8257,6 +12975,175 @@ function populateMaps (extensions, types) {
       types[extension] = type
     }
   })
+}
+
+
+/***/ }),
+
+/***/ 900:
+/***/ ((module) => {
+
+/**
+ * Helpers.
+ */
+
+var s = 1000;
+var m = s * 60;
+var h = m * 60;
+var d = h * 24;
+var w = d * 7;
+var y = d * 365.25;
+
+/**
+ * Parse or format the given `val`.
+ *
+ * Options:
+ *
+ *  - `long` verbose formatting [false]
+ *
+ * @param {String|Number} val
+ * @param {Object} [options]
+ * @throws {Error} throw an error if val is not a non-empty string or a number
+ * @return {String|Number}
+ * @api public
+ */
+
+module.exports = function(val, options) {
+  options = options || {};
+  var type = typeof val;
+  if (type === 'string' && val.length > 0) {
+    return parse(val);
+  } else if (type === 'number' && isFinite(val)) {
+    return options.long ? fmtLong(val) : fmtShort(val);
+  }
+  throw new Error(
+    'val is not a non-empty string or a valid number. val=' +
+      JSON.stringify(val)
+  );
+};
+
+/**
+ * Parse the given `str` and return milliseconds.
+ *
+ * @param {String} str
+ * @return {Number}
+ * @api private
+ */
+
+function parse(str) {
+  str = String(str);
+  if (str.length > 100) {
+    return;
+  }
+  var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
+    str
+  );
+  if (!match) {
+    return;
+  }
+  var n = parseFloat(match[1]);
+  var type = (match[2] || 'ms').toLowerCase();
+  switch (type) {
+    case 'years':
+    case 'year':
+    case 'yrs':
+    case 'yr':
+    case 'y':
+      return n * y;
+    case 'weeks':
+    case 'week':
+    case 'w':
+      return n * w;
+    case 'days':
+    case 'day':
+    case 'd':
+      return n * d;
+    case 'hours':
+    case 'hour':
+    case 'hrs':
+    case 'hr':
+    case 'h':
+      return n * h;
+    case 'minutes':
+    case 'minute':
+    case 'mins':
+    case 'min':
+    case 'm':
+      return n * m;
+    case 'seconds':
+    case 'second':
+    case 'secs':
+    case 'sec':
+    case 's':
+      return n * s;
+    case 'milliseconds':
+    case 'millisecond':
+    case 'msecs':
+    case 'msec':
+    case 'ms':
+      return n;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Short format for `ms`.
+ *
+ * @param {Number} ms
+ * @return {String}
+ * @api private
+ */
+
+function fmtShort(ms) {
+  var msAbs = Math.abs(ms);
+  if (msAbs >= d) {
+    return Math.round(ms / d) + 'd';
+  }
+  if (msAbs >= h) {
+    return Math.round(ms / h) + 'h';
+  }
+  if (msAbs >= m) {
+    return Math.round(ms / m) + 'm';
+  }
+  if (msAbs >= s) {
+    return Math.round(ms / s) + 's';
+  }
+  return ms + 'ms';
+}
+
+/**
+ * Long format for `ms`.
+ *
+ * @param {Number} ms
+ * @return {String}
+ * @api private
+ */
+
+function fmtLong(ms) {
+  var msAbs = Math.abs(ms);
+  if (msAbs >= d) {
+    return plural(ms, msAbs, d, 'day');
+  }
+  if (msAbs >= h) {
+    return plural(ms, msAbs, h, 'hour');
+  }
+  if (msAbs >= m) {
+    return plural(ms, msAbs, m, 'minute');
+  }
+  if (msAbs >= s) {
+    return plural(ms, msAbs, s, 'second');
+  }
+  return ms + ' ms';
+}
+
+/**
+ * Pluralization helper.
+ */
+
+function plural(ms, msAbs, n, name) {
+  var isPlural = msAbs >= n * 1.5;
+  return Math.round(ms / n) + ' ' + name + (isPlural ? 's' : '');
 }
 
 
@@ -12238,6 +17125,122 @@ exports.pathCase = pathCase;
 
 /***/ }),
 
+/***/ 3329:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+var parseUrl = __nccwpck_require__(8835).parse;
+
+var DEFAULT_PORTS = {
+  ftp: 21,
+  gopher: 70,
+  http: 80,
+  https: 443,
+  ws: 80,
+  wss: 443,
+};
+
+var stringEndsWith = String.prototype.endsWith || function(s) {
+  return s.length <= this.length &&
+    this.indexOf(s, this.length - s.length) !== -1;
+};
+
+/**
+ * @param {string|object} url - The URL, or the result from url.parse.
+ * @return {string} The URL of the proxy that should handle the request to the
+ *  given URL. If no proxy is set, this will be an empty string.
+ */
+function getProxyForUrl(url) {
+  var parsedUrl = typeof url === 'string' ? parseUrl(url) : url || {};
+  var proto = parsedUrl.protocol;
+  var hostname = parsedUrl.host;
+  var port = parsedUrl.port;
+  if (typeof hostname !== 'string' || !hostname || typeof proto !== 'string') {
+    return '';  // Don't proxy URLs without a valid scheme or host.
+  }
+
+  proto = proto.split(':', 1)[0];
+  // Stripping ports in this way instead of using parsedUrl.hostname to make
+  // sure that the brackets around IPv6 addresses are kept.
+  hostname = hostname.replace(/:\d*$/, '');
+  port = parseInt(port) || DEFAULT_PORTS[proto] || 0;
+  if (!shouldProxy(hostname, port)) {
+    return '';  // Don't proxy URLs that match NO_PROXY.
+  }
+
+  var proxy =
+    getEnv('npm_config_' + proto + '_proxy') ||
+    getEnv(proto + '_proxy') ||
+    getEnv('npm_config_proxy') ||
+    getEnv('all_proxy');
+  if (proxy && proxy.indexOf('://') === -1) {
+    // Missing scheme in proxy, default to the requested URL's scheme.
+    proxy = proto + '://' + proxy;
+  }
+  return proxy;
+}
+
+/**
+ * Determines whether a given URL should be proxied.
+ *
+ * @param {string} hostname - The host name of the URL.
+ * @param {number} port - The effective port of the URL.
+ * @returns {boolean} Whether the given URL should be proxied.
+ * @private
+ */
+function shouldProxy(hostname, port) {
+  var NO_PROXY =
+    (getEnv('npm_config_no_proxy') || getEnv('no_proxy')).toLowerCase();
+  if (!NO_PROXY) {
+    return true;  // Always proxy if NO_PROXY is not set.
+  }
+  if (NO_PROXY === '*') {
+    return false;  // Never proxy if wildcard is set.
+  }
+
+  return NO_PROXY.split(/[,\s]/).every(function(proxy) {
+    if (!proxy) {
+      return true;  // Skip zero-length hosts.
+    }
+    var parsedProxy = proxy.match(/^(.+):(\d+)$/);
+    var parsedProxyHostname = parsedProxy ? parsedProxy[1] : proxy;
+    var parsedProxyPort = parsedProxy ? parseInt(parsedProxy[2]) : 0;
+    if (parsedProxyPort && parsedProxyPort !== port) {
+      return true;  // Skip if ports don't match.
+    }
+
+    if (!/^[.*]/.test(parsedProxyHostname)) {
+      // No wildcards, so stop proxying if there is an exact match.
+      return hostname !== parsedProxyHostname;
+    }
+
+    if (parsedProxyHostname.charAt(0) === '*') {
+      // Remove leading wildcard.
+      parsedProxyHostname = parsedProxyHostname.slice(1);
+    }
+    // Stop proxying if the hostname ends with the no_proxy host.
+    return !stringEndsWith.call(hostname, parsedProxyHostname);
+  });
+}
+
+/**
+ * Get the value for an environment variable.
+ *
+ * @param {string} key - The name of the environment variable.
+ * @return {string} The value of the environment variable.
+ * @private
+ */
+function getEnv(key) {
+  return process.env[key.toLowerCase()] || process.env[key.toUpperCase()] || '';
+}
+
+exports.getProxyForUrl = getProxyForUrl;
+
+
+/***/ }),
+
 /***/ 9229:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -12279,6 +17282,149 @@ function snakeCase(input, options) {
 }
 exports.snakeCase = snakeCase;
 //# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 9318:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+"use strict";
+
+const os = __nccwpck_require__(2087);
+const tty = __nccwpck_require__(3867);
+const hasFlag = __nccwpck_require__(1621);
+
+const {env} = process;
+
+let forceColor;
+if (hasFlag('no-color') ||
+	hasFlag('no-colors') ||
+	hasFlag('color=false') ||
+	hasFlag('color=never')) {
+	forceColor = 0;
+} else if (hasFlag('color') ||
+	hasFlag('colors') ||
+	hasFlag('color=true') ||
+	hasFlag('color=always')) {
+	forceColor = 1;
+}
+
+if ('FORCE_COLOR' in env) {
+	if (env.FORCE_COLOR === 'true') {
+		forceColor = 1;
+	} else if (env.FORCE_COLOR === 'false') {
+		forceColor = 0;
+	} else {
+		forceColor = env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3);
+	}
+}
+
+function translateLevel(level) {
+	if (level === 0) {
+		return false;
+	}
+
+	return {
+		level,
+		hasBasic: true,
+		has256: level >= 2,
+		has16m: level >= 3
+	};
+}
+
+function supportsColor(haveStream, streamIsTTY) {
+	if (forceColor === 0) {
+		return 0;
+	}
+
+	if (hasFlag('color=16m') ||
+		hasFlag('color=full') ||
+		hasFlag('color=truecolor')) {
+		return 3;
+	}
+
+	if (hasFlag('color=256')) {
+		return 2;
+	}
+
+	if (haveStream && !streamIsTTY && forceColor === undefined) {
+		return 0;
+	}
+
+	const min = forceColor || 0;
+
+	if (env.TERM === 'dumb') {
+		return min;
+	}
+
+	if (process.platform === 'win32') {
+		// Windows 10 build 10586 is the first Windows release that supports 256 colors.
+		// Windows 10 build 14931 is the first release that supports 16m/TrueColor.
+		const osRelease = os.release().split('.');
+		if (
+			Number(osRelease[0]) >= 10 &&
+			Number(osRelease[2]) >= 10586
+		) {
+			return Number(osRelease[2]) >= 14931 ? 3 : 2;
+		}
+
+		return 1;
+	}
+
+	if ('CI' in env) {
+		if (['TRAVIS', 'CIRCLECI', 'APPVEYOR', 'GITLAB_CI', 'GITHUB_ACTIONS', 'BUILDKITE'].some(sign => sign in env) || env.CI_NAME === 'codeship') {
+			return 1;
+		}
+
+		return min;
+	}
+
+	if ('TEAMCITY_VERSION' in env) {
+		return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
+	}
+
+	if (env.COLORTERM === 'truecolor') {
+		return 3;
+	}
+
+	if ('TERM_PROGRAM' in env) {
+		const version = parseInt((env.TERM_PROGRAM_VERSION || '').split('.')[0], 10);
+
+		switch (env.TERM_PROGRAM) {
+			case 'iTerm.app':
+				return version >= 3 ? 3 : 2;
+			case 'Apple_Terminal':
+				return 2;
+			// No default
+		}
+	}
+
+	if (/-256(color)?$/i.test(env.TERM)) {
+		return 2;
+	}
+
+	if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
+		return 1;
+	}
+
+	if ('COLORTERM' in env) {
+		return 1;
+	}
+
+	return min;
+}
+
+function getSupportLevel(stream) {
+	const level = supportsColor(stream, stream && stream.isTTY);
+	return translateLevel(level);
+}
+
+module.exports = {
+	supportsColor: getSupportLevel,
+	stdout: translateLevel(supportsColor(true, tty.isatty(1))),
+	stderr: translateLevel(supportsColor(true, tty.isatty(2)))
+};
+
 
 /***/ }),
 
@@ -17805,3757 +22951,3774 @@ module.exports = eval("require")("utf-8-validate");
 
 /***/ }),
 
-/***/ 7091:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ 1441:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 "use strict";
+// Axios v1.1.3 Copyright (c) 2022 Matt Zabriskie and contributors
 
 
-var NodeFetch = __nccwpck_require__(467);
-var NodeFormData = __nccwpck_require__(7034);
-var buffer = __nccwpck_require__(4293);
-var NodeAbortController = __nccwpck_require__(1659);
+const FormData$1 = __nccwpck_require__(1403);
+const url = __nccwpck_require__(8835);
+const proxyFromEnv = __nccwpck_require__(3329);
+const http = __nccwpck_require__(8605);
+const https = __nccwpck_require__(7211);
+const followRedirects = __nccwpck_require__(7707);
+const zlib = __nccwpck_require__(8761);
+const stream = __nccwpck_require__(2413);
+const EventEmitter = __nccwpck_require__(8614);
 
-const Blob = globalThis.Blob ?? buffer.Blob;
-const FormData = globalThis.FormData ?? NodeFormData;
-const Headers = globalThis.Headers ?? NodeFetch.Headers;
-const Request = globalThis.Request ?? NodeFetch.Request;
-const Response = globalThis.Response ?? NodeFetch.Response;
-const fetch = globalThis.fetch ?? NodeFetch.default;
-const AbortController =
-  globalThis.AbortController ?? NodeAbortController.AbortController;
-const AbortSignal = globalThis.AbortSignal ?? NodeAbortController.AbortSignal;
+function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
 
-exports.Blob = Blob;
-exports.FormData = FormData;
-exports.Headers = Headers;
-exports.Request = Request;
-exports.Response = Response;
-exports.fetch = fetch;
-exports.AbortController = AbortController;
-exports.AbortSignal = AbortSignal;
+const FormData__default = /*#__PURE__*/_interopDefaultLegacy(FormData$1);
+const url__default = /*#__PURE__*/_interopDefaultLegacy(url);
+const http__default = /*#__PURE__*/_interopDefaultLegacy(http);
+const https__default = /*#__PURE__*/_interopDefaultLegacy(https);
+const followRedirects__default = /*#__PURE__*/_interopDefaultLegacy(followRedirects);
+const zlib__default = /*#__PURE__*/_interopDefaultLegacy(zlib);
+const stream__default = /*#__PURE__*/_interopDefaultLegacy(stream);
+const EventEmitter__default = /*#__PURE__*/_interopDefaultLegacy(EventEmitter);
 
-
-/***/ }),
-
-/***/ 3703:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-var ponyfills = __nccwpck_require__(7091);
-var semver = __nccwpck_require__(1013);
-var changeCase = __nccwpck_require__(9091);
-var EventEmitter = __nccwpck_require__(1848);
-var WebSocket = __nccwpck_require__(4713);
-
-class BaseLogger {
-    constructor(logLevel) {
-        this.logLevel = logLevel;
-    }
-    debug(message, meta) {
-        if (this.logLevel.satisfies('debug')) {
-            this.log('debug', message, meta);
-        }
-    }
-    info(message, meta) {
-        if (this.logLevel.satisfies('info')) {
-            this.log('info', message, meta);
-        }
-    }
-    warn(message, meta) {
-        if (this.logLevel.satisfies('warn')) {
-            this.log('warn', message, meta);
-        }
-    }
-    error(message, meta) {
-        if (this.logLevel.satisfies('error')) {
-            this.log('error', message, meta);
-        }
-    }
+function bind(fn, thisArg) {
+  return function wrap() {
+    return fn.apply(thisArg, arguments);
+  };
 }
 
-/* eslint-disable no-console */
-class LoggerConsoleImpl extends BaseLogger {
-    constructor(logLevel) {
-        super(logLevel);
-    }
-    log(type, message, meta) {
-        switch (type) {
-            case 'debug': {
-                console.debug(message, meta);
-                return;
-            }
-            case 'info': {
-                console.info(message, meta);
-                return;
-            }
-            case 'warn': {
-                console.warn(message, meta);
-                return;
-            }
-            case 'error': {
-                console.error(message, meta);
-                return;
-            }
-        }
-    }
+// utils is a library of generic helper functions non-specific to axios
+
+const {toString} = Object.prototype;
+const {getPrototypeOf} = Object;
+
+const kindOf = (cache => thing => {
+    const str = toString.call(thing);
+    return cache[str] || (cache[str] = str.slice(8, -1).toLowerCase());
+})(Object.create(null));
+
+const kindOfTest = (type) => {
+  type = type.toLowerCase();
+  return (thing) => kindOf(thing) === type
+};
+
+const typeOfTest = type => thing => typeof thing === type;
+
+/**
+ * Determine if a value is an Array
+ *
+ * @param {Object} val The value to test
+ *
+ * @returns {boolean} True if value is an Array, otherwise false
+ */
+const {isArray} = Array;
+
+/**
+ * Determine if a value is undefined
+ *
+ * @param {*} val The value to test
+ *
+ * @returns {boolean} True if the value is undefined, otherwise false
+ */
+const isUndefined = typeOfTest('undefined');
+
+/**
+ * Determine if a value is a Buffer
+ *
+ * @param {*} val The value to test
+ *
+ * @returns {boolean} True if value is a Buffer, otherwise false
+ */
+function isBuffer(val) {
+  return val !== null && !isUndefined(val) && val.constructor !== null && !isUndefined(val.constructor)
+    && isFunction(val.constructor.isBuffer) && val.constructor.isBuffer(val);
 }
 
-/* eslint-disable unicorn/prefer-math-trunc */
-const LOG_TYPES = Object.freeze({
-    DEBUG: 1 << 0,
-    INFO: 1 << 1,
-    WARN: 1 << 2,
-    ERROR: 1 << 3,
+/**
+ * Determine if a value is an ArrayBuffer
+ *
+ * @param {*} val The value to test
+ *
+ * @returns {boolean} True if value is an ArrayBuffer, otherwise false
+ */
+const isArrayBuffer = kindOfTest('ArrayBuffer');
+
+
+/**
+ * Determine if a value is a view on an ArrayBuffer
+ *
+ * @param {*} val The value to test
+ *
+ * @returns {boolean} True if value is a view on an ArrayBuffer, otherwise false
+ */
+function isArrayBufferView(val) {
+  let result;
+  if ((typeof ArrayBuffer !== 'undefined') && (ArrayBuffer.isView)) {
+    result = ArrayBuffer.isView(val);
+  } else {
+    result = (val) && (val.buffer) && (isArrayBuffer(val.buffer));
+  }
+  return result;
+}
+
+/**
+ * Determine if a value is a String
+ *
+ * @param {*} val The value to test
+ *
+ * @returns {boolean} True if value is a String, otherwise false
+ */
+const isString = typeOfTest('string');
+
+/**
+ * Determine if a value is a Function
+ *
+ * @param {*} val The value to test
+ * @returns {boolean} True if value is a Function, otherwise false
+ */
+const isFunction = typeOfTest('function');
+
+/**
+ * Determine if a value is a Number
+ *
+ * @param {*} val The value to test
+ *
+ * @returns {boolean} True if value is a Number, otherwise false
+ */
+const isNumber = typeOfTest('number');
+
+/**
+ * Determine if a value is an Object
+ *
+ * @param {*} thing The value to test
+ *
+ * @returns {boolean} True if value is an Object, otherwise false
+ */
+const isObject = (thing) => thing !== null && typeof thing === 'object';
+
+/**
+ * Determine if a value is a Boolean
+ *
+ * @param {*} thing The value to test
+ * @returns {boolean} True if value is a Boolean, otherwise false
+ */
+const isBoolean = thing => thing === true || thing === false;
+
+/**
+ * Determine if a value is a plain Object
+ *
+ * @param {*} val The value to test
+ *
+ * @returns {boolean} True if value is a plain Object, otherwise false
+ */
+const isPlainObject = (val) => {
+  if (kindOf(val) !== 'object') {
+    return false;
+  }
+
+  const prototype = getPrototypeOf(val);
+  return (prototype === null || prototype === Object.prototype || Object.getPrototypeOf(prototype) === null) && !(Symbol.toStringTag in val) && !(Symbol.iterator in val);
+};
+
+/**
+ * Determine if a value is a Date
+ *
+ * @param {*} val The value to test
+ *
+ * @returns {boolean} True if value is a Date, otherwise false
+ */
+const isDate = kindOfTest('Date');
+
+/**
+ * Determine if a value is a File
+ *
+ * @param {*} val The value to test
+ *
+ * @returns {boolean} True if value is a File, otherwise false
+ */
+const isFile = kindOfTest('File');
+
+/**
+ * Determine if a value is a Blob
+ *
+ * @param {*} val The value to test
+ *
+ * @returns {boolean} True if value is a Blob, otherwise false
+ */
+const isBlob = kindOfTest('Blob');
+
+/**
+ * Determine if a value is a FileList
+ *
+ * @param {*} val The value to test
+ *
+ * @returns {boolean} True if value is a File, otherwise false
+ */
+const isFileList = kindOfTest('FileList');
+
+/**
+ * Determine if a value is a Stream
+ *
+ * @param {*} val The value to test
+ *
+ * @returns {boolean} True if value is a Stream, otherwise false
+ */
+const isStream = (val) => isObject(val) && isFunction(val.pipe);
+
+/**
+ * Determine if a value is a FormData
+ *
+ * @param {*} thing The value to test
+ *
+ * @returns {boolean} True if value is an FormData, otherwise false
+ */
+const isFormData = (thing) => {
+  const pattern = '[object FormData]';
+  return thing && (
+    (typeof FormData === 'function' && thing instanceof FormData) ||
+    toString.call(thing) === pattern ||
+    (isFunction(thing.toString) && thing.toString() === pattern)
+  );
+};
+
+/**
+ * Determine if a value is a URLSearchParams object
+ *
+ * @param {*} val The value to test
+ *
+ * @returns {boolean} True if value is a URLSearchParams object, otherwise false
+ */
+const isURLSearchParams = kindOfTest('URLSearchParams');
+
+/**
+ * Trim excess whitespace off the beginning and end of a string
+ *
+ * @param {String} str The String to trim
+ *
+ * @returns {String} The String freed of excess whitespace
+ */
+const trim = (str) => str.trim ?
+  str.trim() : str.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '');
+
+/**
+ * Iterate over an Array or an Object invoking a function for each item.
+ *
+ * If `obj` is an Array callback will be called passing
+ * the value, index, and complete array for each item.
+ *
+ * If 'obj' is an Object callback will be called passing
+ * the value, key, and complete object for each property.
+ *
+ * @param {Object|Array} obj The object to iterate
+ * @param {Function} fn The callback to invoke for each item
+ *
+ * @param {Boolean} [allOwnKeys = false]
+ * @returns {void}
+ */
+function forEach(obj, fn, {allOwnKeys = false} = {}) {
+  // Don't bother if no value provided
+  if (obj === null || typeof obj === 'undefined') {
+    return;
+  }
+
+  let i;
+  let l;
+
+  // Force an array if not already something iterable
+  if (typeof obj !== 'object') {
+    /*eslint no-param-reassign:0*/
+    obj = [obj];
+  }
+
+  if (isArray(obj)) {
+    // Iterate over array values
+    for (i = 0, l = obj.length; i < l; i++) {
+      fn.call(null, obj[i], i, obj);
+    }
+  } else {
+    // Iterate over object keys
+    const keys = allOwnKeys ? Object.getOwnPropertyNames(obj) : Object.keys(obj);
+    const len = keys.length;
+    let key;
+
+    for (i = 0; i < len; i++) {
+      key = keys[i];
+      fn.call(null, obj[key], key, obj);
+    }
+  }
+}
+
+/**
+ * Accepts varargs expecting each argument to be an object, then
+ * immutably merges the properties of each object and returns result.
+ *
+ * When multiple objects contain the same key the later object in
+ * the arguments list will take precedence.
+ *
+ * Example:
+ *
+ * ```js
+ * var result = merge({foo: 123}, {foo: 456});
+ * console.log(result.foo); // outputs 456
+ * ```
+ *
+ * @param {Object} obj1 Object to merge
+ *
+ * @returns {Object} Result of all merge properties
+ */
+function merge(/* obj1, obj2, obj3, ... */) {
+  const result = {};
+  const assignValue = (val, key) => {
+    if (isPlainObject(result[key]) && isPlainObject(val)) {
+      result[key] = merge(result[key], val);
+    } else if (isPlainObject(val)) {
+      result[key] = merge({}, val);
+    } else if (isArray(val)) {
+      result[key] = val.slice();
+    } else {
+      result[key] = val;
+    }
+  };
+
+  for (let i = 0, l = arguments.length; i < l; i++) {
+    arguments[i] && forEach(arguments[i], assignValue);
+  }
+  return result;
+}
+
+/**
+ * Extends object a by mutably adding to it the properties of object b.
+ *
+ * @param {Object} a The object to be extended
+ * @param {Object} b The object to copy properties from
+ * @param {Object} thisArg The object to bind function to
+ *
+ * @param {Boolean} [allOwnKeys]
+ * @returns {Object} The resulting value of object a
+ */
+const extend = (a, b, thisArg, {allOwnKeys}= {}) => {
+  forEach(b, (val, key) => {
+    if (thisArg && isFunction(val)) {
+      a[key] = bind(val, thisArg);
+    } else {
+      a[key] = val;
+    }
+  }, {allOwnKeys});
+  return a;
+};
+
+/**
+ * Remove byte order marker. This catches EF BB BF (the UTF-8 BOM)
+ *
+ * @param {string} content with BOM
+ *
+ * @returns {string} content value without BOM
+ */
+const stripBOM = (content) => {
+  if (content.charCodeAt(0) === 0xFEFF) {
+    content = content.slice(1);
+  }
+  return content;
+};
+
+/**
+ * Inherit the prototype methods from one constructor into another
+ * @param {function} constructor
+ * @param {function} superConstructor
+ * @param {object} [props]
+ * @param {object} [descriptors]
+ *
+ * @returns {void}
+ */
+const inherits = (constructor, superConstructor, props, descriptors) => {
+  constructor.prototype = Object.create(superConstructor.prototype, descriptors);
+  constructor.prototype.constructor = constructor;
+  Object.defineProperty(constructor, 'super', {
+    value: superConstructor.prototype
+  });
+  props && Object.assign(constructor.prototype, props);
+};
+
+/**
+ * Resolve object with deep prototype chain to a flat object
+ * @param {Object} sourceObj source object
+ * @param {Object} [destObj]
+ * @param {Function|Boolean} [filter]
+ * @param {Function} [propFilter]
+ *
+ * @returns {Object}
+ */
+const toFlatObject = (sourceObj, destObj, filter, propFilter) => {
+  let props;
+  let i;
+  let prop;
+  const merged = {};
+
+  destObj = destObj || {};
+  // eslint-disable-next-line no-eq-null,eqeqeq
+  if (sourceObj == null) return destObj;
+
+  do {
+    props = Object.getOwnPropertyNames(sourceObj);
+    i = props.length;
+    while (i-- > 0) {
+      prop = props[i];
+      if ((!propFilter || propFilter(prop, sourceObj, destObj)) && !merged[prop]) {
+        destObj[prop] = sourceObj[prop];
+        merged[prop] = true;
+      }
+    }
+    sourceObj = filter !== false && getPrototypeOf(sourceObj);
+  } while (sourceObj && (!filter || filter(sourceObj, destObj)) && sourceObj !== Object.prototype);
+
+  return destObj;
+};
+
+/**
+ * Determines whether a string ends with the characters of a specified string
+ *
+ * @param {String} str
+ * @param {String} searchString
+ * @param {Number} [position= 0]
+ *
+ * @returns {boolean}
+ */
+const endsWith = (str, searchString, position) => {
+  str = String(str);
+  if (position === undefined || position > str.length) {
+    position = str.length;
+  }
+  position -= searchString.length;
+  const lastIndex = str.indexOf(searchString, position);
+  return lastIndex !== -1 && lastIndex === position;
+};
+
+
+/**
+ * Returns new array from array like object or null if failed
+ *
+ * @param {*} [thing]
+ *
+ * @returns {?Array}
+ */
+const toArray = (thing) => {
+  if (!thing) return null;
+  if (isArray(thing)) return thing;
+  let i = thing.length;
+  if (!isNumber(i)) return null;
+  const arr = new Array(i);
+  while (i-- > 0) {
+    arr[i] = thing[i];
+  }
+  return arr;
+};
+
+/**
+ * Checking if the Uint8Array exists and if it does, it returns a function that checks if the
+ * thing passed in is an instance of Uint8Array
+ *
+ * @param {TypedArray}
+ *
+ * @returns {Array}
+ */
+// eslint-disable-next-line func-names
+const isTypedArray = (TypedArray => {
+  // eslint-disable-next-line func-names
+  return thing => {
+    return TypedArray && thing instanceof TypedArray;
+  };
+})(typeof Uint8Array !== 'undefined' && getPrototypeOf(Uint8Array));
+
+/**
+ * For each entry in the object, call the function with the key and value.
+ *
+ * @param {Object<any, any>} obj - The object to iterate over.
+ * @param {Function} fn - The function to call for each entry.
+ *
+ * @returns {void}
+ */
+const forEachEntry = (obj, fn) => {
+  const generator = obj && obj[Symbol.iterator];
+
+  const iterator = generator.call(obj);
+
+  let result;
+
+  while ((result = iterator.next()) && !result.done) {
+    const pair = result.value;
+    fn.call(obj, pair[0], pair[1]);
+  }
+};
+
+/**
+ * It takes a regular expression and a string, and returns an array of all the matches
+ *
+ * @param {string} regExp - The regular expression to match against.
+ * @param {string} str - The string to search.
+ *
+ * @returns {Array<boolean>}
+ */
+const matchAll = (regExp, str) => {
+  let matches;
+  const arr = [];
+
+  while ((matches = regExp.exec(str)) !== null) {
+    arr.push(matches);
+  }
+
+  return arr;
+};
+
+/* Checking if the kindOfTest function returns true when passed an HTMLFormElement. */
+const isHTMLForm = kindOfTest('HTMLFormElement');
+
+const toCamelCase = str => {
+  return str.toLowerCase().replace(/[_-\s]([a-z\d])(\w*)/g,
+    function replacer(m, p1, p2) {
+      return p1.toUpperCase() + p2;
+    }
+  );
+};
+
+/* Creating a function that will check if an object has a property. */
+const hasOwnProperty = (({hasOwnProperty}) => (obj, prop) => hasOwnProperty.call(obj, prop))(Object.prototype);
+
+/**
+ * Determine if a value is a RegExp object
+ *
+ * @param {*} val The value to test
+ *
+ * @returns {boolean} True if value is a RegExp object, otherwise false
+ */
+const isRegExp = kindOfTest('RegExp');
+
+const reduceDescriptors = (obj, reducer) => {
+  const descriptors = Object.getOwnPropertyDescriptors(obj);
+  const reducedDescriptors = {};
+
+  forEach(descriptors, (descriptor, name) => {
+    if (reducer(descriptor, name, obj) !== false) {
+      reducedDescriptors[name] = descriptor;
+    }
+  });
+
+  Object.defineProperties(obj, reducedDescriptors);
+};
+
+/**
+ * Makes all methods read-only
+ * @param {Object} obj
+ */
+
+const freezeMethods = (obj) => {
+  reduceDescriptors(obj, (descriptor, name) => {
+    const value = obj[name];
+
+    if (!isFunction(value)) return;
+
+    descriptor.enumerable = false;
+
+    if ('writable' in descriptor) {
+      descriptor.writable = false;
+      return;
+    }
+
+    if (!descriptor.set) {
+      descriptor.set = () => {
+        throw Error('Can not read-only method \'' + name + '\'');
+      };
+    }
+  });
+};
+
+const toObjectSet = (arrayOrString, delimiter) => {
+  const obj = {};
+
+  const define = (arr) => {
+    arr.forEach(value => {
+      obj[value] = true;
+    });
+  };
+
+  isArray(arrayOrString) ? define(arrayOrString) : define(String(arrayOrString).split(delimiter));
+
+  return obj;
+};
+
+const noop = () => {};
+
+const toFiniteNumber = (value, defaultValue) => {
+  value = +value;
+  return Number.isFinite(value) ? value : defaultValue;
+};
+
+const utils = {
+  isArray,
+  isArrayBuffer,
+  isBuffer,
+  isFormData,
+  isArrayBufferView,
+  isString,
+  isNumber,
+  isBoolean,
+  isObject,
+  isPlainObject,
+  isUndefined,
+  isDate,
+  isFile,
+  isBlob,
+  isRegExp,
+  isFunction,
+  isStream,
+  isURLSearchParams,
+  isTypedArray,
+  isFileList,
+  forEach,
+  merge,
+  extend,
+  trim,
+  stripBOM,
+  inherits,
+  toFlatObject,
+  kindOf,
+  kindOfTest,
+  endsWith,
+  toArray,
+  forEachEntry,
+  matchAll,
+  isHTMLForm,
+  hasOwnProperty,
+  hasOwnProp: hasOwnProperty, // an alias to avoid ESLint no-prototype-builtins detection
+  reduceDescriptors,
+  freezeMethods,
+  toObjectSet,
+  toCamelCase,
+  noop,
+  toFiniteNumber
+};
+
+/**
+ * Create an Error with the specified message, config, error code, request and response.
+ *
+ * @param {string} message The error message.
+ * @param {string} [code] The error code (for example, 'ECONNABORTED').
+ * @param {Object} [config] The config.
+ * @param {Object} [request] The request.
+ * @param {Object} [response] The response.
+ *
+ * @returns {Error} The created error.
+ */
+function AxiosError(message, code, config, request, response) {
+  Error.call(this);
+
+  if (Error.captureStackTrace) {
+    Error.captureStackTrace(this, this.constructor);
+  } else {
+    this.stack = (new Error()).stack;
+  }
+
+  this.message = message;
+  this.name = 'AxiosError';
+  code && (this.code = code);
+  config && (this.config = config);
+  request && (this.request = request);
+  response && (this.response = response);
+}
+
+utils.inherits(AxiosError, Error, {
+  toJSON: function toJSON() {
+    return {
+      // Standard
+      message: this.message,
+      name: this.name,
+      // Microsoft
+      description: this.description,
+      number: this.number,
+      // Mozilla
+      fileName: this.fileName,
+      lineNumber: this.lineNumber,
+      columnNumber: this.columnNumber,
+      stack: this.stack,
+      // Axios
+      config: this.config,
+      code: this.code,
+      status: this.response && this.response.status ? this.response.status : null
+    };
+  }
 });
-class LogLevel {
-    constructor(level) {
-        this.level = level;
-    }
-    satisfies(type) {
-        switch (type) {
-            case 'debug': {
-                return Boolean(this.level & LOG_TYPES.DEBUG);
-            }
-            case 'info': {
-                return Boolean(this.level & LOG_TYPES.INFO);
-            }
-            case 'warn': {
-                return Boolean(this.level & LOG_TYPES.WARN);
-            }
-            case 'error': {
-                return Boolean(this.level & LOG_TYPES.ERROR);
-            }
-        }
-    }
-    static from(type) {
-        switch (type) {
-            case 'debug': {
-                return new LogLevel(LOG_TYPES.DEBUG | LOG_TYPES.INFO | LOG_TYPES.WARN | LOG_TYPES.ERROR);
-            }
-            case 'info': {
-                return new LogLevel(LOG_TYPES.INFO | LOG_TYPES.WARN | LOG_TYPES.ERROR);
-            }
-            case 'warn': {
-                return new LogLevel(LOG_TYPES.WARN | LOG_TYPES.ERROR);
-            }
-            case 'error': {
-                return new LogLevel(LOG_TYPES.ERROR);
-            }
-        }
-    }
-}
 
-const delay = (ms) => new Promise((resolve) => setTimeout(() => resolve(), ms));
+const prototype$1 = AxiosError.prototype;
+const descriptors = {};
 
-class Timeout {
-    constructor(millisecond) {
-        this.abortController = new ponyfills.AbortController();
-        this.timeout = setTimeout(() => {
-            this.abortController.abort();
-        }, millisecond);
-    }
-    get signal() {
-        return this.abortController.signal;
-    }
-    clear() {
-        clearTimeout(this.timeout);
-    }
-}
+[
+  'ERR_BAD_OPTION_VALUE',
+  'ERR_BAD_OPTION',
+  'ECONNABORTED',
+  'ETIMEDOUT',
+  'ERR_NETWORK',
+  'ERR_FR_TOO_MANY_REDIRECTS',
+  'ERR_DEPRECATED',
+  'ERR_BAD_RESPONSE',
+  'ERR_BAD_REQUEST',
+  'ERR_CANCELED',
+  'ERR_NOT_SUPPORT',
+  'ERR_INVALID_URL'
+// eslint-disable-next-line func-names
+].forEach(code => {
+  descriptors[code] = {value: code};
+});
 
-const mergeAbortSignals = (signals) => {
-    const abortController = new ponyfills.AbortController();
-    for (const signal of signals) {
-        signal.addEventListener('abort', () => abortController.abort());
-    }
-    return abortController.signal;
+Object.defineProperties(AxiosError, descriptors);
+Object.defineProperty(prototype$1, 'isAxiosError', {value: true});
+
+// eslint-disable-next-line func-names
+AxiosError.from = (error, code, config, request, response, customProps) => {
+  const axiosError = Object.create(prototype$1);
+
+  utils.toFlatObject(error, axiosError, function filter(obj) {
+    return obj !== Error.prototype;
+  }, prop => {
+    return prop !== 'isAxiosError';
+  });
+
+  AxiosError.call(axiosError, error.message, code, config, request, response);
+
+  axiosError.cause = error;
+
+  axiosError.name = error.name;
+
+  customProps && Object.assign(axiosError, customProps);
+
+  return axiosError;
 };
 
-/* eslint-disable unicorn/no-array-for-each */
-const mergeHeadersInit = ([head, ...tail]) => {
-    const headers = new ponyfills.Headers(head);
-    for (const entry of tail) {
-        new ponyfills.Headers(entry).forEach((value, key) => {
-            headers.set(key, value);
+/**
+ * Determines if the given thing is a array or js object.
+ *
+ * @param {string} thing - The object or array to be visited.
+ *
+ * @returns {boolean}
+ */
+function isVisitable(thing) {
+  return utils.isPlainObject(thing) || utils.isArray(thing);
+}
+
+/**
+ * It removes the brackets from the end of a string
+ *
+ * @param {string} key - The key of the parameter.
+ *
+ * @returns {string} the key without the brackets.
+ */
+function removeBrackets(key) {
+  return utils.endsWith(key, '[]') ? key.slice(0, -2) : key;
+}
+
+/**
+ * It takes a path, a key, and a boolean, and returns a string
+ *
+ * @param {string} path - The path to the current key.
+ * @param {string} key - The key of the current object being iterated over.
+ * @param {string} dots - If true, the key will be rendered with dots instead of brackets.
+ *
+ * @returns {string} The path to the current key.
+ */
+function renderKey(path, key, dots) {
+  if (!path) return key;
+  return path.concat(key).map(function each(token, i) {
+    // eslint-disable-next-line no-param-reassign
+    token = removeBrackets(token);
+    return !dots && i ? '[' + token + ']' : token;
+  }).join(dots ? '.' : '');
+}
+
+/**
+ * If the array is an array and none of its elements are visitable, then it's a flat array.
+ *
+ * @param {Array<any>} arr - The array to check
+ *
+ * @returns {boolean}
+ */
+function isFlatArray(arr) {
+  return utils.isArray(arr) && !arr.some(isVisitable);
+}
+
+const predicates = utils.toFlatObject(utils, {}, null, function filter(prop) {
+  return /^is[A-Z]/.test(prop);
+});
+
+/**
+ * If the thing is a FormData object, return true, otherwise return false.
+ *
+ * @param {unknown} thing - The thing to check.
+ *
+ * @returns {boolean}
+ */
+function isSpecCompliant(thing) {
+  return thing && utils.isFunction(thing.append) && thing[Symbol.toStringTag] === 'FormData' && thing[Symbol.iterator];
+}
+
+/**
+ * Convert a data object to FormData
+ *
+ * @param {Object} obj
+ * @param {?Object} [formData]
+ * @param {?Object} [options]
+ * @param {Function} [options.visitor]
+ * @param {Boolean} [options.metaTokens = true]
+ * @param {Boolean} [options.dots = false]
+ * @param {?Boolean} [options.indexes = false]
+ *
+ * @returns {Object}
+ **/
+
+/**
+ * It converts an object into a FormData object
+ *
+ * @param {Object<any, any>} obj - The object to convert to form data.
+ * @param {string} formData - The FormData object to append to.
+ * @param {Object<string, any>} options
+ *
+ * @returns
+ */
+function toFormData(obj, formData, options) {
+  if (!utils.isObject(obj)) {
+    throw new TypeError('target must be an object');
+  }
+
+  // eslint-disable-next-line no-param-reassign
+  formData = formData || new (FormData__default["default"] || FormData)();
+
+  // eslint-disable-next-line no-param-reassign
+  options = utils.toFlatObject(options, {
+    metaTokens: true,
+    dots: false,
+    indexes: false
+  }, false, function defined(option, source) {
+    // eslint-disable-next-line no-eq-null,eqeqeq
+    return !utils.isUndefined(source[option]);
+  });
+
+  const metaTokens = options.metaTokens;
+  // eslint-disable-next-line no-use-before-define
+  const visitor = options.visitor || defaultVisitor;
+  const dots = options.dots;
+  const indexes = options.indexes;
+  const _Blob = options.Blob || typeof Blob !== 'undefined' && Blob;
+  const useBlob = _Blob && isSpecCompliant(formData);
+
+  if (!utils.isFunction(visitor)) {
+    throw new TypeError('visitor must be a function');
+  }
+
+  function convertValue(value) {
+    if (value === null) return '';
+
+    if (utils.isDate(value)) {
+      return value.toISOString();
+    }
+
+    if (!useBlob && utils.isBlob(value)) {
+      throw new AxiosError('Blob is not supported. Use a Buffer instead.');
+    }
+
+    if (utils.isArrayBuffer(value) || utils.isTypedArray(value)) {
+      return useBlob && typeof Blob === 'function' ? new Blob([value]) : Buffer.from(value);
+    }
+
+    return value;
+  }
+
+  /**
+   * Default visitor.
+   *
+   * @param {*} value
+   * @param {String|Number} key
+   * @param {Array<String|Number>} path
+   * @this {FormData}
+   *
+   * @returns {boolean} return true to visit the each prop of the value recursively
+   */
+  function defaultVisitor(value, key, path) {
+    let arr = value;
+
+    if (value && !path && typeof value === 'object') {
+      if (utils.endsWith(key, '{}')) {
+        // eslint-disable-next-line no-param-reassign
+        key = metaTokens ? key : key.slice(0, -2);
+        // eslint-disable-next-line no-param-reassign
+        value = JSON.stringify(value);
+      } else if (
+        (utils.isArray(value) && isFlatArray(value)) ||
+        (utils.isFileList(value) || utils.endsWith(key, '[]') && (arr = utils.toArray(value))
+        )) {
+        // eslint-disable-next-line no-param-reassign
+        key = removeBrackets(key);
+
+        arr.forEach(function each(el, index) {
+          !(utils.isUndefined(el) || el === null) && formData.append(
+            // eslint-disable-next-line no-nested-ternary
+            indexes === true ? renderKey([key], index, dots) : (indexes === null ? key : key + '[]'),
+            convertValue(el)
+          );
         });
+        return false;
+      }
     }
-    return headers;
+
+    if (isVisitable(value)) {
+      return true;
+    }
+
+    formData.append(renderKey(path, key, dots), convertValue(value));
+
+    return false;
+  }
+
+  const stack = [];
+
+  const exposedHelpers = Object.assign(predicates, {
+    defaultVisitor,
+    convertValue,
+    isVisitable
+  });
+
+  function build(value, path) {
+    if (utils.isUndefined(value)) return;
+
+    if (stack.indexOf(value) !== -1) {
+      throw Error('Circular reference detected in ' + path.join('.'));
+    }
+
+    stack.push(value);
+
+    utils.forEach(value, function each(el, key) {
+      const result = !(utils.isUndefined(el) || el === null) && visitor.call(
+        formData, el, utils.isString(key) ? key.trim() : key, path, exposedHelpers
+      );
+
+      if (result === true) {
+        build(el, path ? path.concat(key) : [key]);
+      }
+    });
+
+    stack.pop();
+  }
+
+  if (!utils.isObject(obj)) {
+    throw new TypeError('data must be an object');
+  }
+
+  build(obj);
+
+  return formData;
+}
+
+/**
+ * It encodes a string by replacing all characters that are not in the unreserved set with
+ * their percent-encoded equivalents
+ *
+ * @param {string} str - The string to encode.
+ *
+ * @returns {string} The encoded string.
+ */
+function encode$1(str) {
+  const charMap = {
+    '!': '%21',
+    "'": '%27',
+    '(': '%28',
+    ')': '%29',
+    '~': '%7E',
+    '%20': '+',
+    '%00': '\x00'
+  };
+  return encodeURIComponent(str).replace(/[!'()~]|%20|%00/g, function replacer(match) {
+    return charMap[match];
+  });
+}
+
+/**
+ * It takes a params object and converts it to a FormData object
+ *
+ * @param {Object<string, any>} params - The parameters to be converted to a FormData object.
+ * @param {Object<string, any>} options - The options object passed to the Axios constructor.
+ *
+ * @returns {void}
+ */
+function AxiosURLSearchParams(params, options) {
+  this._pairs = [];
+
+  params && toFormData(params, this, options);
+}
+
+const prototype = AxiosURLSearchParams.prototype;
+
+prototype.append = function append(name, value) {
+  this._pairs.push([name, value]);
 };
 
-const DEFAULT_TIMEOUT_MS = 1000 * 300;
-class MastoConfig {
-    constructor(props, serializer) {
-        this.props = props;
-        this.serializer = serializer;
-    }
-    createHeader(override = {}) {
-        var _a, _b;
-        const headersInit = mergeHeadersInit([
-            (_b = (_a = this.props.defaultRequestInit) === null || _a === void 0 ? void 0 : _a.headers) !== null && _b !== void 0 ? _b : {},
-            { 'Content-Type': 'application/json' },
-            override,
-        ]);
-        const headers = new ponyfills.Headers(headersInit);
-        if (this.props.accessToken) {
-            headers.set('Authorization', `Bearer ${this.props.accessToken}`);
-        }
-        return new ponyfills.Headers(headers);
-    }
-    createWebsocketProtocols(protocols = []) {
-        return this.supportsSecureToken() && this.props.accessToken != undefined
-            ? [this.props.accessToken, ...protocols]
-            : protocols;
-    }
-    resolveHttpPath(path, params) {
-        const url = new URL(path, this.props.url);
-        if (params) {
-            url.search = this.serializer.serializeQueryString(Object.fromEntries(params.entries()));
-        }
-        return url;
-    }
-    resolveWebsocketPath(path, params = {}) {
-        const url = new URL(this.props.streamingApiUrl.replace(/\/$/, '') + path);
-        if (!this.supportsSecureToken()) {
-            params.accessToken = this.props.accessToken;
-        }
-        url.search = this.serializer.serializeQueryString(params);
-        return url.toString();
-    }
-    createTimeout() {
-        var _a;
-        return new Timeout((_a = this.props.timeout) !== null && _a !== void 0 ? _a : DEFAULT_TIMEOUT_MS);
-    }
-    createAbortSignal(signal) {
-        var _a;
-        const timeout = this.createTimeout();
-        const signals = [timeout.signal];
-        if ((_a = this.props.defaultRequestInit) === null || _a === void 0 ? void 0 : _a.signal) {
-            // FIXME: `abort-controller` and `node-fetch` mismatches
-            signals.push(this.props.defaultRequestInit.signal);
-        }
-        if (signal != undefined) {
-            signals.push(signal);
-        }
-        return [mergeAbortSignals(signals), timeout];
-    }
-    getLogLevel() {
-        var _a;
-        return LogLevel.from((_a = this.props.logLevel) !== null && _a !== void 0 ? _a : 'warn');
-    }
-    shouldWarnDeprecated() {
-        return !this.props.disableDeprecatedWarning;
-    }
-    satisfiesVersion(since, until) {
-        var _a, _b, _c, _d;
-        if (this.props.version == undefined || this.props.disableVersionCheck) {
-            return {
-                compat: 'compatible',
-                version: (_a = this.props.version) === null || _a === void 0 ? void 0 : _a.version,
-            };
-        }
-        if (since && semver.lt(this.props.version, since)) {
-            return {
-                compat: 'unimplemented',
-                version: (_b = this.props.version) === null || _b === void 0 ? void 0 : _b.version,
-            };
-        }
-        if (until && semver.gt(this.props.version, until)) {
-            return {
-                compat: 'removed',
-                version: (_c = this.props.version) === null || _c === void 0 ? void 0 : _c.version,
-            };
-        }
-        return {
-            compat: 'compatible',
-            version: (_d = this.props.version) === null || _d === void 0 ? void 0 : _d.version,
-        };
-    }
-    supportsSecureToken() {
-        if (this.props.version == undefined || this.props.disableVersionCheck) {
-            return true;
-        }
-        // Since v2.8.4, it is supported to pass access token with`Sec-Websocket-Protocol`
-        // https://github.com/tootsuite/mastodon/pull/10818
-        return (this.props.streamingApiUrl.startsWith('wss:') &&
-            semver.gte(this.props.version, new semver.SemVer('2.8.4', { loose: true })));
-    }
+prototype.toString = function toString(encoder) {
+  const _encode = encoder ? function(value) {
+    return encoder.call(this, value, encode$1);
+  } : encode$1;
+
+  return this._pairs.map(function each(pair) {
+    return _encode(pair[0]) + '=' + _encode(pair[1]);
+  }, '').join('&');
+};
+
+/**
+ * It replaces all instances of the characters `:`, `$`, `,`, `+`, `[`, and `]` with their
+ * URI encoded counterparts
+ *
+ * @param {string} val The value to be encoded.
+ *
+ * @returns {string} The encoded value.
+ */
+function encode(val) {
+  return encodeURIComponent(val).
+    replace(/%3A/gi, ':').
+    replace(/%24/g, '$').
+    replace(/%2C/gi, ',').
+    replace(/%20/g, '+').
+    replace(/%5B/gi, '[').
+    replace(/%5D/gi, ']');
 }
 
-class BaseHttp {
-    get(path, data, init = {}) {
-        return this.request({
-            path,
-            searchParams: new URLSearchParams(data),
-            requestInit: Object.assign({ method: 'GET' }, init),
-        }).then((response) => response.data);
+/**
+ * Build a URL by appending params to the end
+ *
+ * @param {string} url The base of the url (e.g., http://www.google.com)
+ * @param {object} [params] The params to be appended
+ * @param {?object} options
+ *
+ * @returns {string} The formatted url
+ */
+function buildURL(url, params, options) {
+  /*eslint no-param-reassign:0*/
+  if (!params) {
+    return url;
+  }
+  
+  const _encode = options && options.encode || encode;
+
+  const serializeFn = options && options.serialize;
+
+  let serializedParams;
+
+  if (serializeFn) {
+    serializedParams = serializeFn(params, options);
+  } else {
+    serializedParams = utils.isURLSearchParams(params) ?
+      params.toString() :
+      new AxiosURLSearchParams(params, options).toString(_encode);
+  }
+
+  if (serializedParams) {
+    const hashmarkIndex = url.indexOf("#");
+
+    if (hashmarkIndex !== -1) {
+      url = url.slice(0, hashmarkIndex);
     }
-    post(path, data, init = {}) {
-        return this.request({
-            path,
-            body: data,
-            requestInit: Object.assign({ method: 'POST' }, init),
-        }).then((response) => response.data);
-    }
-    delete(path, data, init = {}) {
-        return this.request({
-            path,
-            body: data,
-            requestInit: Object.assign({ method: 'DELETE' }, init),
-        }).then((response) => response.data);
-    }
-    put(path, data, init = {}) {
-        return this.request({
-            path,
-            body: data,
-            requestInit: Object.assign({ method: 'PUT' }, init),
-        }).then((response) => response.data);
-    }
-    patch(path, data, init = {}) {
-        return this.request({
-            path,
-            body: data,
-            requestInit: Object.assign({ method: 'PATCH' }, init),
-        }).then((response) => response.data);
-    }
+    url += (url.indexOf('?') === -1 ? '?' : '&') + serializedParams;
+  }
+
+  return url;
 }
 
-/******************************************************************************
-Copyright (c) Microsoft Corporation.
+class InterceptorManager {
+  constructor() {
+    this.handlers = [];
+  }
 
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted.
+  /**
+   * Add a new interceptor to the stack
+   *
+   * @param {Function} fulfilled The function to handle `then` for a `Promise`
+   * @param {Function} rejected The function to handle `reject` for a `Promise`
+   *
+   * @return {Number} An ID used to remove interceptor later
+   */
+  use(fulfilled, rejected, options) {
+    this.handlers.push({
+      fulfilled,
+      rejected,
+      synchronous: options ? options.synchronous : false,
+      runWhen: options ? options.runWhen : null
+    });
+    return this.handlers.length - 1;
+  }
 
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-***************************************************************************** */
+  /**
+   * Remove an interceptor from the stack
+   *
+   * @param {Number} id The ID that was returned by `use`
+   *
+   * @returns {Boolean} `true` if the interceptor was removed, `false` otherwise
+   */
+  eject(id) {
+    if (this.handlers[id]) {
+      this.handlers[id] = null;
+    }
+  }
 
-function __decorate(decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
+  /**
+   * Clear all interceptors from the stack
+   *
+   * @returns {void}
+   */
+  clear() {
+    if (this.handlers) {
+      this.handlers = [];
+    }
+  }
+
+  /**
+   * Iterate over all the registered interceptors
+   *
+   * This method is particularly useful for skipping over any
+   * interceptors that may have become `null` calling `eject`.
+   *
+   * @param {Function} fn The function to call for each interceptor
+   *
+   * @returns {void}
+   */
+  forEach(fn) {
+    utils.forEach(this.handlers, function forEachHandler(h) {
+      if (h !== null) {
+        fn(h);
+      }
+    });
+  }
 }
 
-function __awaiter(thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
+const transitionalDefaults = {
+  silentJSONParsing: true,
+  forcedJSONParsing: true,
+  clarifyTimeoutError: false
+};
+
+const URLSearchParams = url__default["default"].URLSearchParams;
+
+const platform = {
+  isNode: true,
+  classes: {
+    URLSearchParams,
+    FormData: FormData__default["default"],
+    Blob: typeof Blob !== 'undefined' && Blob || null
+  },
+  protocols: [ 'http', 'https', 'file', 'data' ]
+};
+
+function toURLEncodedForm(data, options) {
+  return toFormData(data, new platform.classes.URLSearchParams(), Object.assign({
+    visitor: function(value, key, path, helpers) {
+      if (utils.isBuffer(value)) {
+        this.append(key, value.toString('base64'));
+        return false;
+      }
+
+      return helpers.defaultVisitor.apply(this, arguments);
+    }
+  }, options));
+}
+
+/**
+ * It takes a string like `foo[x][y][z]` and returns an array like `['foo', 'x', 'y', 'z']
+ *
+ * @param {string} name - The name of the property to get.
+ *
+ * @returns An array of strings.
+ */
+function parsePropPath(name) {
+  // foo[x][y][z]
+  // foo.x.y.z
+  // foo-x-y-z
+  // foo x y z
+  return utils.matchAll(/\w+|\[(\w*)]/g, name).map(match => {
+    return match[0] === '[]' ? '' : match[1] || match[0];
+  });
+}
+
+/**
+ * Convert an array to an object.
+ *
+ * @param {Array<any>} arr - The array to convert to an object.
+ *
+ * @returns An object with the same keys and values as the array.
+ */
+function arrayToObject(arr) {
+  const obj = {};
+  const keys = Object.keys(arr);
+  let i;
+  const len = keys.length;
+  let key;
+  for (i = 0; i < len; i++) {
+    key = keys[i];
+    obj[key] = arr[key];
+  }
+  return obj;
+}
+
+/**
+ * It takes a FormData object and returns a JavaScript object
+ *
+ * @param {string} formData The FormData object to convert to JSON.
+ *
+ * @returns {Object<string, any> | null} The converted object.
+ */
+function formDataToJSON(formData) {
+  function buildPath(path, value, target, index) {
+    let name = path[index++];
+    const isNumericKey = Number.isFinite(+name);
+    const isLast = index >= path.length;
+    name = !name && utils.isArray(target) ? target.length : name;
+
+    if (isLast) {
+      if (utils.hasOwnProp(target, name)) {
+        target[name] = [target[name], value];
+      } else {
+        target[name] = value;
+      }
+
+      return !isNumericKey;
+    }
+
+    if (!target[name] || !utils.isObject(target[name])) {
+      target[name] = [];
+    }
+
+    const result = buildPath(path, value, target[name], index);
+
+    if (result && utils.isArray(target[name])) {
+      target[name] = arrayToObject(target[name]);
+    }
+
+    return !isNumericKey;
+  }
+
+  if (utils.isFormData(formData) && utils.isFunction(formData.entries)) {
+    const obj = {};
+
+    utils.forEachEntry(formData, (name, value) => {
+      buildPath(parsePropPath(name), value, obj, 0);
+    });
+
+    return obj;
+  }
+
+  return null;
+}
+
+/**
+ * Resolve or reject a Promise based on response status.
+ *
+ * @param {Function} resolve A function that resolves the promise.
+ * @param {Function} reject A function that rejects the promise.
+ * @param {object} response The response.
+ *
+ * @returns {object} The response.
+ */
+function settle(resolve, reject, response) {
+  const validateStatus = response.config.validateStatus;
+  if (!response.status || !validateStatus || validateStatus(response.status)) {
+    resolve(response);
+  } else {
+    reject(new AxiosError(
+      'Request failed with status code ' + response.status,
+      [AxiosError.ERR_BAD_REQUEST, AxiosError.ERR_BAD_RESPONSE][Math.floor(response.status / 100) - 4],
+      response.config,
+      response.request,
+      response
+    ));
+  }
+}
+
+/**
+ * Determines whether the specified URL is absolute
+ *
+ * @param {string} url The URL to test
+ *
+ * @returns {boolean} True if the specified URL is absolute, otherwise false
+ */
+function isAbsoluteURL(url) {
+  // A URL is considered absolute if it begins with "<scheme>://" or "//" (protocol-relative URL).
+  // RFC 3986 defines scheme name as a sequence of characters beginning with a letter and followed
+  // by any combination of letters, digits, plus, period, or hyphen.
+  return /^([a-z][a-z\d+\-.]*:)?\/\//i.test(url);
+}
+
+/**
+ * Creates a new URL by combining the specified URLs
+ *
+ * @param {string} baseURL The base URL
+ * @param {string} relativeURL The relative URL
+ *
+ * @returns {string} The combined URL
+ */
+function combineURLs(baseURL, relativeURL) {
+  return relativeURL
+    ? baseURL.replace(/\/+$/, '') + '/' + relativeURL.replace(/^\/+/, '')
+    : baseURL;
+}
+
+/**
+ * Creates a new URL by combining the baseURL with the requestedURL,
+ * only when the requestedURL is not already an absolute URL.
+ * If the requestURL is absolute, this function returns the requestedURL untouched.
+ *
+ * @param {string} baseURL The base URL
+ * @param {string} requestedURL Absolute or relative URL to combine
+ *
+ * @returns {string} The combined full path
+ */
+function buildFullPath(baseURL, requestedURL) {
+  if (baseURL && !isAbsoluteURL(requestedURL)) {
+    return combineURLs(baseURL, requestedURL);
+  }
+  return requestedURL;
+}
+
+const VERSION = "1.1.3";
+
+/**
+ * A `CanceledError` is an object that is thrown when an operation is canceled.
+ *
+ * @param {string=} message The message.
+ * @param {Object=} config The config.
+ * @param {Object=} request The request.
+ *
+ * @returns {CanceledError} The created error.
+ */
+function CanceledError(message, config, request) {
+  // eslint-disable-next-line no-eq-null,eqeqeq
+  AxiosError.call(this, message == null ? 'canceled' : message, AxiosError.ERR_CANCELED, config, request);
+  this.name = 'CanceledError';
+}
+
+utils.inherits(CanceledError, AxiosError, {
+  __CANCEL__: true
+});
+
+function parseProtocol(url) {
+  const match = /^([-+\w]{1,25})(:?\/\/|:)/.exec(url);
+  return match && match[1] || '';
+}
+
+const DATA_URL_PATTERN = /^(?:([^;]+);)?(?:[^;]+;)?(base64|),([\s\S]*)$/;
+
+/**
+ * Parse data uri to a Buffer or Blob
+ *
+ * @param {String} uri
+ * @param {?Boolean} asBlob
+ * @param {?Object} options
+ * @param {?Function} options.Blob
+ *
+ * @returns {Buffer|Blob}
+ */
+function fromDataURI(uri, asBlob, options) {
+  const _Blob = options && options.Blob || platform.classes.Blob;
+  const protocol = parseProtocol(uri);
+
+  if (asBlob === undefined && _Blob) {
+    asBlob = true;
+  }
+
+  if (protocol === 'data') {
+    uri = protocol.length ? uri.slice(protocol.length + 1) : uri;
+
+    const match = DATA_URL_PATTERN.exec(uri);
+
+    if (!match) {
+      throw new AxiosError('Invalid URL', AxiosError.ERR_INVALID_URL);
+    }
+
+    const mime = match[1];
+    const isBase64 = match[2];
+    const body = match[3];
+    const buffer = Buffer.from(decodeURIComponent(body), isBase64 ? 'base64' : 'utf8');
+
+    if (asBlob) {
+      if (!_Blob) {
+        throw new AxiosError('Blob is not supported', AxiosError.ERR_NOT_SUPPORT);
+      }
+
+      return new _Blob([buffer], {type: mime});
+    }
+
+    return buffer;
+  }
+
+  throw new AxiosError('Unsupported protocol ' + protocol, AxiosError.ERR_NOT_SUPPORT);
+}
+
+// RawAxiosHeaders whose duplicates are ignored by node
+// c.f. https://nodejs.org/api/http.html#http_message_headers
+const ignoreDuplicateOf = utils.toObjectSet([
+  'age', 'authorization', 'content-length', 'content-type', 'etag',
+  'expires', 'from', 'host', 'if-modified-since', 'if-unmodified-since',
+  'last-modified', 'location', 'max-forwards', 'proxy-authorization',
+  'referer', 'retry-after', 'user-agent'
+]);
+
+/**
+ * Parse headers into an object
+ *
+ * ```
+ * Date: Wed, 27 Aug 2014 08:58:49 GMT
+ * Content-Type: application/json
+ * Connection: keep-alive
+ * Transfer-Encoding: chunked
+ * ```
+ *
+ * @param {String} rawHeaders Headers needing to be parsed
+ *
+ * @returns {Object} Headers parsed into an object
+ */
+const parseHeaders = rawHeaders => {
+  const parsed = {};
+  let key;
+  let val;
+  let i;
+
+  rawHeaders && rawHeaders.split('\n').forEach(function parser(line) {
+    i = line.indexOf(':');
+    key = line.substring(0, i).trim().toLowerCase();
+    val = line.substring(i + 1).trim();
+
+    if (!key || (parsed[key] && ignoreDuplicateOf[key])) {
+      return;
+    }
+
+    if (key === 'set-cookie') {
+      if (parsed[key]) {
+        parsed[key].push(val);
+      } else {
+        parsed[key] = [val];
+      }
+    } else {
+      parsed[key] = parsed[key] ? parsed[key] + ', ' + val : val;
+    }
+  });
+
+  return parsed;
+};
+
+const $internals = Symbol('internals');
+const $defaults = Symbol('defaults');
+
+function normalizeHeader(header) {
+  return header && String(header).trim().toLowerCase();
+}
+
+function normalizeValue(value) {
+  if (value === false || value == null) {
+    return value;
+  }
+
+  return utils.isArray(value) ? value.map(normalizeValue) : String(value);
+}
+
+function parseTokens(str) {
+  const tokens = Object.create(null);
+  const tokensRE = /([^\s,;=]+)\s*(?:=\s*([^,;]+))?/g;
+  let match;
+
+  while ((match = tokensRE.exec(str))) {
+    tokens[match[1]] = match[2];
+  }
+
+  return tokens;
+}
+
+function matchHeaderValue(context, value, header, filter) {
+  if (utils.isFunction(filter)) {
+    return filter.call(this, value, header);
+  }
+
+  if (!utils.isString(value)) return;
+
+  if (utils.isString(filter)) {
+    return value.indexOf(filter) !== -1;
+  }
+
+  if (utils.isRegExp(filter)) {
+    return filter.test(value);
+  }
+}
+
+function formatHeader(header) {
+  return header.trim()
+    .toLowerCase().replace(/([a-z\d])(\w*)/g, (w, char, str) => {
+      return char.toUpperCase() + str;
     });
 }
 
-/**
- * Error object
- * @see https://docs.joinmastodon.org/entities/error/
- */
-class MastoError extends Error {
-    /**
-     * @param message The error message. Equivalent for the `error` field from the Error entity
-     * @param props Additional properties
-     */
-    constructor(message, props = {}) {
-        super(message, { cause: props.cause });
-        this.name = 'MastoError';
-        /** Helper to check if the error has been thrown from Masto */
-        this.isMastoError = true;
-        Object.setPrototypeOf(this, MastoError.prototype);
-        this.description = props.description;
-        this.details = props.details;
-    }
+function buildAccessors(obj, header) {
+  const accessorName = utils.toCamelCase(' ' + header);
+
+  ['get', 'set', 'has'].forEach(methodName => {
+    Object.defineProperty(obj, methodName + accessorName, {
+      value: function(arg1, arg2, arg3) {
+        return this[methodName].call(this, header, arg1, arg2, arg3);
+      },
+      configurable: true
+    });
+  });
 }
 
-class MastoHttpError extends MastoError {
-    constructor(message, statusCode, props) {
-        super(message, props);
-        this.name = 'MastoHttpError';
-        Object.setPrototypeOf(this, MastoHttpError.prototype);
-        this.statusCode = statusCode;
+function findKey(obj, key) {
+  key = key.toLowerCase();
+  const keys = Object.keys(obj);
+  let i = keys.length;
+  let _key;
+  while (i-- > 0) {
+    _key = keys[i];
+    if (key === _key.toLowerCase()) {
+      return _key;
     }
+  }
+  return null;
 }
 
-/**
- * Mastodon forbidden error
- */
-class MastoHttpConflictError extends MastoHttpError {
-    constructor(message, props) {
-        super(message, 409, props);
-        this.name = 'MastoHttpConflictError';
-        Object.setPrototypeOf(this, MastoHttpConflictError.prototype);
-    }
+function AxiosHeaders(headers, defaults) {
+  headers && this.set(headers);
+  this[$defaults] = defaults || null;
 }
 
-/**
- * Mastodon forbidden error
- */
-class MastoHttpForbiddenError extends MastoHttpError {
-    constructor(message, props) {
-        super(message, 403, props);
-        this.name = 'MastoHttpForbiddenError';
-        Object.setPrototypeOf(this, MastoHttpForbiddenError.prototype);
-    }
-}
+Object.assign(AxiosHeaders.prototype, {
+  set: function(header, valueOrRewrite, rewrite) {
+    const self = this;
 
-/**
- * Mastodon gone error
- */
-class MastoHttpGoneError extends MastoHttpError {
-    constructor(message, props) {
-        super(message, 410, props);
-        this.name = 'MastoHttpGoneError';
-        Object.setPrototypeOf(this, MastoHttpGoneError.prototype);
-    }
-}
+    function setHeader(_value, _header, _rewrite) {
+      const lHeader = normalizeHeader(_header);
 
-/**
- * Mastodon not found error class
- */
-class MastoHttpNotFoundError extends MastoHttpError {
-    constructor(message, props) {
-        super(message, 404, props);
-        this.name = 'MastoHttpNotFoundError';
-        Object.setPrototypeOf(this, MastoHttpNotFoundError.prototype);
-    }
-}
+      if (!lHeader) {
+        throw new Error('header name must be a non-empty string');
+      }
 
-/**
- * Mastodon rate limit error class
- */
-class MastoHttpRateLimitError extends MastoHttpError {
-    constructor(message, props) {
-        super(message, 429, props);
-        this.name = 'MastoHttpRateLimitError';
-        Object.setPrototypeOf(this, MastoHttpRateLimitError.prototype);
-        this.limit = props === null || props === void 0 ? void 0 : props.limit;
-        this.remaining = props === null || props === void 0 ? void 0 : props.remaining;
-        this.reset = props === null || props === void 0 ? void 0 : props.reset;
-    }
-}
+      const key = findKey(self, lHeader);
 
-/**
- * Mastodon unauthorized error class
- */
-class MastoHttpUnauthorizedError extends MastoHttpError {
-    constructor(message, props) {
-        super(message, 401, props);
-        this.name = 'MastoHttpUnauthorizedError';
-        Object.setPrototypeOf(this, MastoHttpUnauthorizedError.prototype);
-    }
-}
-
-class MastoHttpUnexpectedError extends MastoHttpError {
-    constructor(message, statusCode, props) {
-        super(message, statusCode, props);
-        this.name = 'MastoHttpUnexpectedError';
-        Object.setPrototypeOf(this, MastoHttpUnexpectedError.prototype);
-    }
-}
-
-/**
- * Mastodon unprocessable entity
- */
-class MastoHttpUnprocessableEntityError extends MastoHttpError {
-    constructor(message, props) {
-        super(message, 422, props);
-        this.name = 'MastoHttpUnprocessableEntityError';
-        Object.setPrototypeOf(this, MastoHttpUnprocessableEntityError.prototype);
-    }
-}
-
-const createHttpError = (params) => {
-    var _a, _b;
-    const message = (_a = params.message) !== null && _a !== void 0 ? _a : 'Unexpected error occurred';
-    const props = {
-        cause: params.cause,
-        description: (_b = params.description) !== null && _b !== void 0 ? _b : 'No further description is provided for this error',
-        details: params.details,
-    };
-    switch (params.statusCode) {
-        case 401: {
-            return new MastoHttpUnauthorizedError(message, props);
-        }
-        case 403: {
-            return new MastoHttpForbiddenError(message, props);
-        }
-        case 404: {
-            return new MastoHttpNotFoundError(message, props);
-        }
-        case 409: {
-            return new MastoHttpConflictError(message, props);
-        }
-        case 410: {
-            return new MastoHttpGoneError(message, props);
-        }
-        case 422: {
-            return new MastoHttpUnprocessableEntityError(message, props);
-        }
-        case 429: {
-            return new MastoHttpRateLimitError(message, Object.assign(Object.assign({}, props), { limit: params.limit, remaining: params.remaining, reset: params.reset }));
-        }
-        default: {
-            return new MastoHttpUnexpectedError(message, params.statusCode, props);
-        }
-    }
-};
-
-class MastoUnexpectedError extends MastoError {
-    constructor(message, props = {}) {
-        super(message, { cause: props.cause });
-        this.name = 'MastoUnexpectedError';
-        Object.setPrototypeOf(this, MastoUnexpectedError.prototype);
-    }
-}
-
-/**
- * Mastodon Deserialize error
- */
-class MastoDeserializeError extends MastoError {
-    constructor(message, contentType, data, props) {
-        super(message, props);
-        this.contentType = contentType;
-        this.data = data;
-        this.name = 'MastoDeserializeError';
-        Object.setPrototypeOf(this, MastoDeserializeError.prototype);
-    }
-}
-
-/**
- * Mastodon version error
- */
-class MastoVersionError extends MastoError {
-    constructor(message, props) {
-        super(message, props);
-        this.name = 'MastoVersionError';
-        Object.setPrototypeOf(this, MastoVersionError.prototype);
-    }
-}
-
-/**
- * Mastodon Timeout error
- */
-class MastoTimeoutError extends MastoError {
-    constructor(message, props) {
-        super(message, props);
-        this.name = 'MastoTimeoutError';
-        Object.setPrototypeOf(this, MastoTimeoutError.prototype);
-    }
-}
-
-const getContentType = (headers) => {
-    const contentType = headers.get('Content-Type');
-    if (typeof contentType !== 'string') {
+      if (key && _rewrite !== true && (self[key] === false || _rewrite === false)) {
         return;
-    }
-    return contentType.replace(/\s*;.*$/, '');
-};
+      }
 
-class HttpNativeImpl extends BaseHttp {
-    constructor(serializer, config, logger) {
-        super();
-        this.serializer = serializer;
-        this.config = config;
-        this.logger = logger;
+      self[key || _header] = normalizeValue(_value);
     }
-    request(params) {
-        var _a, _b, _c;
-        return __awaiter(this, void 0, void 0, function* () {
-            const [request, timeout] = this.createRequest(params);
-            try {
-                (_a = this.logger) === null || _a === void 0 ? void 0 : _a.debug(`↑ ${request.method} ${request.url}`, request.body);
-                const response = yield ponyfills.fetch(request);
-                if (!response.ok) {
-                    throw response;
-                }
-                timeout.clear();
-                const text = yield response.text();
-                const contentType = getContentType(response.headers);
-                if (contentType == undefined) {
-                    throw new MastoUnexpectedError('Content-Type is not defined');
-                }
-                const data = this.serializer.deserialize(contentType, text);
-                (_b = this.logger) === null || _b === void 0 ? void 0 : _b.debug(`↓ ${request.method} ${request.url}`, text);
-                return {
-                    headers: response.headers,
-                    data,
-                };
-            }
-            catch (error) {
-                (_c = this.logger) === null || _c === void 0 ? void 0 : _c.debug(`HTTP failed`, error);
-                throw yield this.createError(error);
-            }
-        });
+
+    if (utils.isPlainObject(header)) {
+      utils.forEach(header, (_value, _header) => {
+        setHeader(_value, _header, valueOrRewrite);
+      });
+    } else {
+      setHeader(valueOrRewrite, header, rewrite);
     }
-    createRequest(params) {
-        var _a;
-        const { path, searchParams, requestInit } = params;
-        const url = this.config.resolveHttpPath(path, searchParams);
-        const headers = this.config.createHeader(requestInit === null || requestInit === void 0 ? void 0 : requestInit.headers);
-        const [abortSignal, timeout] = this.config.createAbortSignal(requestInit === null || requestInit === void 0 ? void 0 : requestInit.signal);
-        const body = this.serializer.serialize((_a = getContentType(headers)) !== null && _a !== void 0 ? _a : 'application/json', params.body);
-        if (body instanceof ponyfills.FormData) {
-            // As multipart form data should contain an arbitrary boundary,
-            // leave Content-Type header undefined, so that fetch() API
-            // automatically configure Content-Type with an appropriate boundary.
-            headers.delete('Content-Type');
+
+    return this;
+  },
+
+  get: function(header, parser) {
+    header = normalizeHeader(header);
+
+    if (!header) return undefined;
+
+    const key = findKey(this, header);
+
+    if (key) {
+      const value = this[key];
+
+      if (!parser) {
+        return value;
+      }
+
+      if (parser === true) {
+        return parseTokens(value);
+      }
+
+      if (utils.isFunction(parser)) {
+        return parser.call(this, value, key);
+      }
+
+      if (utils.isRegExp(parser)) {
+        return parser.exec(value);
+      }
+
+      throw new TypeError('parser must be boolean|regexp|function');
+    }
+  },
+
+  has: function(header, matcher) {
+    header = normalizeHeader(header);
+
+    if (header) {
+      const key = findKey(this, header);
+
+      return !!(key && (!matcher || matchHeaderValue(this, this[key], key, matcher)));
+    }
+
+    return false;
+  },
+
+  delete: function(header, matcher) {
+    const self = this;
+    let deleted = false;
+
+    function deleteHeader(_header) {
+      _header = normalizeHeader(_header);
+
+      if (_header) {
+        const key = findKey(self, _header);
+
+        if (key && (!matcher || matchHeaderValue(self, self[key], key, matcher))) {
+          delete self[key];
+
+          deleted = true;
         }
-        const request = new ponyfills.Request(url, Object.assign(Object.assign({}, requestInit), { headers,
-            body, signal: abortSignal }));
-        return [request, timeout];
+      }
     }
-    createError(error) {
-        var _a;
-        return __awaiter(this, void 0, void 0, function* () {
-            if (error instanceof ponyfills.Response) {
-                const data = this.serializer.deserialize((_a = getContentType(error.headers)) !== null && _a !== void 0 ? _a : 'application/json', yield error.text());
-                return createHttpError({
-                    cause: error,
-                    statusCode: error.status,
-                    message: data === null || data === void 0 ? void 0 : data.error,
-                    details: data === null || data === void 0 ? void 0 : data.errorDescription,
-                    description: data === null || data === void 0 ? void 0 : data.details,
-                    limit: error.headers.get('X-RateLimit-Limit'),
-                    remaining: error.headers.get('X-RateLimit-Remaining'),
-                    reset: error.headers.get('X-RateLimit-Reset'),
-                });
-            }
-            // TODO: Use abort reason
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if (error != undefined && error.name === 'AbortError') {
-                return new MastoTimeoutError(`Request timed out`, { cause: error });
-            }
-            return error;
-        });
-    }
-}
 
-var index$4 = /*#__PURE__*/Object.freeze({
-  __proto__: null
+    if (utils.isArray(header)) {
+      header.forEach(deleteHeader);
+    } else {
+      deleteHeader(header);
+    }
+
+    return deleted;
+  },
+
+  clear: function() {
+    return Object.keys(this).forEach(this.delete.bind(this));
+  },
+
+  normalize: function(format) {
+    const self = this;
+    const headers = {};
+
+    utils.forEach(this, (value, header) => {
+      const key = findKey(headers, header);
+
+      if (key) {
+        self[key] = normalizeValue(value);
+        delete self[header];
+        return;
+      }
+
+      const normalized = format ? formatHeader(header) : String(header).trim();
+
+      if (normalized !== header) {
+        delete self[header];
+      }
+
+      self[normalized] = normalizeValue(value);
+
+      headers[normalized] = true;
+    });
+
+    return this;
+  },
+
+  toJSON: function(asStrings) {
+    const obj = Object.create(null);
+
+    utils.forEach(Object.assign({}, this[$defaults] || null, this),
+      (value, header) => {
+        if (value == null || value === false) return;
+        obj[header] = asStrings && utils.isArray(value) ? value.join(', ') : value;
+      });
+
+    return obj;
+  }
 });
 
-/**
- * Decorator that verifies the version of the Mastodon instance
- * @param parameters Optional params
- */
-const version = (params) => (_target, name, descriptor) => {
-    const origin = descriptor.value;
-    if (!origin) {
-        throw new MastoUnexpectedError('version can only apply to a method of a class');
+Object.assign(AxiosHeaders, {
+  from: function(thing) {
+    if (utils.isString(thing)) {
+      return new this(parseHeaders(thing));
     }
-    descriptor.value = function (...args) {
-        const since = params.since && new semver.SemVer(params.since, { loose: true });
-        const until = params.until && new semver.SemVer(params.until, { loose: true });
-        const result = this.config.satisfiesVersion(since, until);
-        switch (result.compat) {
-            case 'unimplemented': {
-                throw new MastoVersionError(`${String(this.constructor.name)}.${String(name)}` +
-                    ` is not available with the current Mastodon version ` +
-                    result.version +
-                    ` It requires greater than or equal to version ${since}.`);
-            }
-            case 'removed': {
-                throw new MastoVersionError(`${String(this.constructor.name)}.${String(name)}` +
-                    ` is not available with the current Mastodon version` +
-                    result.version +
-                    ` It was removed on version ${until}.`);
-            }
-            case 'compatible': {
-                return origin.apply(this, args);
-            }
-        }
-    };
-};
+    return thing instanceof this ? thing : new this(thing);
+  },
 
-class Paginator {
-    constructor(http, initialPath, initialParams) {
-        this.http = http;
-        this.pluckNext = (link) => {
-            var _a;
-            if (link == undefined) {
-                return undefined;
-            }
-            const path = (_a = link
-                .match(/<(.+?)>; rel="next"/)) === null || _a === void 0 ? void 0 : _a[1].replace(/^https?:\/\/[^/]+/, '');
-            return path;
+  accessor: function(header) {
+    const internals = this[$internals] = (this[$internals] = {
+      accessors: {}
+    });
+
+    const accessors = internals.accessors;
+    const prototype = this.prototype;
+
+    function defineAccessor(_header) {
+      const lHeader = normalizeHeader(_header);
+
+      if (!accessors[lHeader]) {
+        buildAccessors(prototype, _header);
+        accessors[lHeader] = true;
+      }
+    }
+
+    utils.isArray(header) ? header.forEach(defineAccessor) : defineAccessor(header);
+
+    return this;
+  }
+});
+
+AxiosHeaders.accessor(['Content-Type', 'Content-Length', 'Accept', 'Accept-Encoding', 'User-Agent']);
+
+utils.freezeMethods(AxiosHeaders.prototype);
+utils.freezeMethods(AxiosHeaders);
+
+/**
+ * Throttle decorator
+ * @param {Function} fn
+ * @param {Number} freq
+ * @return {Function}
+ */
+function throttle(fn, freq) {
+  let timestamp = 0;
+  const threshold = 1000 / freq;
+  let timer = null;
+  return function throttled(force, args) {
+    const now = Date.now();
+    if (force || now - timestamp > threshold) {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      timestamp = now;
+      return fn.apply(null, args);
+    }
+    if (!timer) {
+      timer = setTimeout(() => {
+        timer = null;
+        timestamp = Date.now();
+        return fn.apply(null, args);
+      }, threshold - (now - timestamp));
+    }
+  };
+}
+
+/**
+ * Calculate data maxRate
+ * @param {Number} [samplesCount= 10]
+ * @param {Number} [min= 1000]
+ * @returns {Function}
+ */
+function speedometer(samplesCount, min) {
+  samplesCount = samplesCount || 10;
+  const bytes = new Array(samplesCount);
+  const timestamps = new Array(samplesCount);
+  let head = 0;
+  let tail = 0;
+  let firstSampleTS;
+
+  min = min !== undefined ? min : 1000;
+
+  return function push(chunkLength) {
+    const now = Date.now();
+
+    const startedAt = timestamps[tail];
+
+    if (!firstSampleTS) {
+      firstSampleTS = now;
+    }
+
+    bytes[head] = chunkLength;
+    timestamps[head] = now;
+
+    let i = tail;
+    let bytesCount = 0;
+
+    while (i !== head) {
+      bytesCount += bytes[i++];
+      i = i % samplesCount;
+    }
+
+    head = (head + 1) % samplesCount;
+
+    if (head === tail) {
+      tail = (tail + 1) % samplesCount;
+    }
+
+    if (now - firstSampleTS < min) {
+      return;
+    }
+
+    const passed = startedAt && now - startedAt;
+
+    return  passed ? Math.round(bytesCount * 1000 / passed) : undefined;
+  };
+}
+
+const kInternals = Symbol('internals');
+
+class AxiosTransformStream extends stream__default["default"].Transform{
+  constructor(options) {
+    options = utils.toFlatObject(options, {
+      maxRate: 0,
+      chunkSize: 64 * 1024,
+      minChunkSize: 100,
+      timeWindow: 500,
+      ticksRate: 2,
+      samplesCount: 15
+    }, null, (prop, source) => {
+      return !utils.isUndefined(source[prop]);
+    });
+
+    super({
+      readableHighWaterMark: options.chunkSize
+    });
+
+    const self = this;
+
+    const internals = this[kInternals] = {
+      length: options.length,
+      timeWindow: options.timeWindow,
+      ticksRate: options.ticksRate,
+      chunkSize: options.chunkSize,
+      maxRate: options.maxRate,
+      minChunkSize: options.minChunkSize,
+      bytesSeen: 0,
+      isCaptured: false,
+      notifiedBytesLoaded: 0,
+      ts: Date.now(),
+      bytes: 0,
+      onReadCallback: null
+    };
+
+    const _speedometer = speedometer(internals.ticksRate * options.samplesCount, internals.timeWindow);
+
+    this.on('newListener', event => {
+      if (event === 'progress') {
+        if (!internals.isCaptured) {
+          internals.isCaptured = true;
+        }
+      }
+    });
+
+    let bytesNotified = 0;
+
+    internals.updateProgress = throttle(function throttledHandler() {
+      const totalBytes = internals.length;
+      const bytesTransferred = internals.bytesSeen;
+      const progressBytes = bytesTransferred - bytesNotified;
+      if (!progressBytes || self.destroyed) return;
+
+      const rate = _speedometer(progressBytes);
+
+      bytesNotified = bytesTransferred;
+
+      process.nextTick(() => {
+        self.emit('progress', {
+          'loaded': bytesTransferred,
+          'total': totalBytes,
+          'progress': totalBytes ? (bytesTransferred / totalBytes) : undefined,
+          'bytes': progressBytes,
+          'rate': rate ? rate : undefined,
+          'estimated': rate && totalBytes && bytesTransferred <= totalBytes ?
+            (totalBytes - bytesTransferred) / rate : undefined
+        });
+      });
+    }, internals.ticksRate);
+
+    const onFinish = () => {
+      internals.updateProgress(true);
+    };
+
+    this.once('end', onFinish);
+    this.once('error', onFinish);
+  }
+
+  _read(size) {
+    const internals = this[kInternals];
+
+    if (internals.onReadCallback) {
+      internals.onReadCallback();
+    }
+
+    return super._read(size);
+  }
+
+  _transform(chunk, encoding, callback) {
+    const self = this;
+    const internals = this[kInternals];
+    const maxRate = internals.maxRate;
+
+    const readableHighWaterMark = this.readableHighWaterMark;
+
+    const timeWindow = internals.timeWindow;
+
+    const divider = 1000 / timeWindow;
+    const bytesThreshold = (maxRate / divider);
+    const minChunkSize = internals.minChunkSize !== false ? Math.max(internals.minChunkSize, bytesThreshold * 0.01) : 0;
+
+    function pushChunk(_chunk, _callback) {
+      const bytes = Buffer.byteLength(_chunk);
+      internals.bytesSeen += bytes;
+      internals.bytes += bytes;
+
+      if (internals.isCaptured) {
+        internals.updateProgress();
+      }
+
+      if (self.push(_chunk)) {
+        process.nextTick(_callback);
+      } else {
+        internals.onReadCallback = () => {
+          internals.onReadCallback = null;
+          process.nextTick(_callback);
         };
-        this.nextPath = initialPath;
-        this.nextParams = initialParams;
+      }
     }
-    next() {
-        var _a;
-        return __awaiter(this, void 0, void 0, function* () {
-            if (this.nextPath == undefined) {
-                return { done: true, value: undefined };
-            }
-            const response = yield this.http.request({
-                requestInit: { method: 'GET' },
-                path: this.nextPath,
-                searchParams: new URLSearchParams(this.nextParams),
-            });
-            const next = (_a = this.pluckNext(response.headers.get('link'))) === null || _a === void 0 ? void 0 : _a.split('?');
-            this.nextPath = next === null || next === void 0 ? void 0 : next[0];
-            this.nextParams = Object.fromEntries(new URLSearchParams(next === null || next === void 0 ? void 0 : next[1]).entries());
-            return {
-                done: false,
-                value: response.data,
-            };
-        });
-    }
-    return(value) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return {
-                done: true,
-                value: yield value,
-            };
-        });
-    }
-    throw(e) {
-        return __awaiter(this, void 0, void 0, function* () {
-            throw e;
-        });
-    }
-    then(onfulfilled = Promise.resolve, onrejected = Promise.reject) {
-        return this.next().then((value) => onfulfilled(value.value), onrejected);
-    }
-    [Symbol.asyncIterator]() {
-        return this;
-    }
-}
 
-let AccountRepository$1 = class AccountRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * View information about a profile.
-     * @param id The id of the account in the database
-     * @return Account
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/accounts/${id}`);
-    }
-    /**
-     * Creates a user and account records. Returns an account access token
-     * for the app that initiated the request. The app should save this token for later,
-     * and should wait for the user to confirm their account by clicking a link in their email inbox.
-     * @param params Parameters
-     * @return Token
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    create(params) {
-        return this.http.post(`/api/v1/accounts`, params);
-    }
-    /**
-     * Test to make sure that the user token works.
-     * @return the user's own Account with Source
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    verifyCredentials() {
-        return this.http.get('/api/v1/accounts/verify_credentials');
-    }
-    /**
-     *  Update the user's display and preferences.
-     * @param params Parameters
-     * @return the user's own Account with Source
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    updateCredentials(params) {
-        return this.http.patch('/api/v1/accounts/update_credentials', params, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-        });
-    }
-    /**
-     * Accounts which follow the given account, if network is not hidden by the account owner.
-     * @param id The id of the account in the database
-     * @param params Parameters
-     * @return Array of Account
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    listFollowers(id, params = {}) {
-        return new Paginator(this.http, `/api/v1/accounts/${id}/followers`, params);
-    }
-    /**
-     * Accounts which the given account is following, if network is not hidden by the account owner.
-     * @param id The id of the account in the database
-     * @param params Parameters
-     * @return Array of Account
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    listFollowing(id, params = {}) {
-        return new Paginator(this.http, `/api/v1/accounts/${id}/following`, params);
-    }
-    /**
-     * Statuses posted to the given account.
-     * @param id The id of the account in the database
-     * @param params Parameters
-     * @return Array of Status
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    listStatuses(id, params = {}) {
-        return new Paginator(this.http, `/api/v1/accounts/${id}/statuses`, params);
-    }
-    /**
-     * Follow the given account.
-     * @param id The id of the account in the database
-     * @param params Parameters
-     * @return Relationship
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    follow(id, params) {
-        return this.http.post(`/api/v1/accounts/${id}/follow`, params);
-    }
-    /**
-     * Unfollow the given account
-     * @param id The id of the account in the database
-     * @return Relationship
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    unfollow(id, params) {
-        return this.http.post(`/api/v1/accounts/${id}/unfollow`, params);
-    }
-    /**
-     * Find out whether a given account is followed, blocked, muted, etc.
-     * @param id Array of account IDs to check
-     * @return Array of Relationship
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    fetchRelationships(id) {
-        return this.http.get('/api/v1/accounts/relationships', {
-            id,
-        });
-    }
-    /**
-     * Search for matching accounts by username or display name.
-     * @param params Parameters
-     * @return Array of Account
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    search(params) {
-        return new Paginator(this.http, `/api/v1/accounts/search`, params);
-    }
-    /**
-     * Block the given account. Clients should filter statuses from this account if received (e.g. due to a boost in the Home timeline)
-     * @param id The id of the account in the database
-     * @return Relationship
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    block(id) {
-        return this.http.post(`/api/v1/accounts/${id}/block`);
-    }
-    /**
-     * Unblock the given account.
-     * @param id The id of the account in the database
-     * @return Relationship
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    unblock(id) {
-        return this.http.post(`/api/v1/accounts/${id}/unblock`);
-    }
-    /**
-     * Add the given account to the user's featured profiles. (Featured profiles are currently shown on the user's own public profile.)
-     * @param id The id of the account in the database
-     * @return Relationship
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    pin(id) {
-        return this.http.post(`/api/v1/accounts/${id}/pin`);
-    }
-    /**
-     * Remove the given account from the user's featured profiles.
-     * @param id The id of the account in the database
-     * @return Relationship
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    unpin(id) {
-        return this.http.post(`/api/v1/accounts/${id}/unpin`);
-    }
-    /**
-     * Fetch the list with the given ID. Used for verifying the title of a list.
-     * @param id ID of the list in the database
-     * @return Array of List
-     * @see https://docs.joinmastodon.org/methods/timelines/lists/
-     */
-    listLists(id) {
-        return new Paginator(this.http, `/api/v1/accounts/${id}/lists`);
-    }
-    /**
-     * Mute the given account. Clients should filter statuses and notifications from this account, if received (e.g. due to a boost in the Home timeline).
-     * @param id The id of the account in the database
-     * @param params Parameter
-     * @return Relationship
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    mute(id, params) {
-        return this.http.post(`/api/v1/accounts/${id}/mute`, params);
-    }
-    /**
-     * Unmute the given account.
-     * @param id The id of the account in the database
-     * @return Relationship
-     * @see https://docs.joinmastodon.org/methods/accounts/
-     */
-    unmute(id) {
-        return this.http.post(`/api/v1/accounts/${id}/unmute`);
-    }
-    /**
-     * Add personal note to the account
-     * @param id ID of the account
-     * @param param Parameters
-     * @return Relationship
-     */
-    createNote(id, params) {
-        return this.http.post(`/api/v1/accounts/${id}/note`, params);
-    }
-    /**
-     * Get featured tag of the account
-     * @param id ID of the account
-     * @return FeaturedTags
-     */
-    listFeaturedTags(id) {
-        return new Paginator(this.http, `/api/v1/accounts/${id}/featured_tags`);
-    }
-    /**
-     * Identity proofs
-     * @param id The id of the account in the database
-     * @return Array of IdentityProof
-     * @see https://github.com/tootsuite/mastodon/pull/10297
-     */
-    listIdentityProofs(id) {
-        return new Paginator(this.http, `/api/v1/accounts/${id}/identity_proofs`);
-    }
-    /**
-     * This method allows to quickly convert a username of a known account to an ID that can be used with the REST API, or to check if a username is available for sign-up
-     * @param params Parameters
-     * @return Account
-     */
-    lookup(params) {
-        return this.http.get('/api/v1/accounts/lookup', params);
-    }
-    /**
-     * Obtain a list of all accounts that follow a given account, filtered for accounts you follow.
-     * @returns Array of FamiliarFollowers
-     */
-    fetchFamiliarFollowers(id) {
-        return this.http.get(`/api/v1/accounts/familiar_followers`, { id });
-    }
-    /**
-     * @param id ID of the account
-     * @returns N/A
-     */
-    removeFromFollowers(id) {
-        return this.http.post(`/api/v1/accounts/${id}/remove_from_followers`);
-    }
-};
-__decorate([
-    version({ since: '0.0.0' })
-], AccountRepository$1.prototype, "fetch", null);
-__decorate([
-    version({ since: '2.7.0' })
-], AccountRepository$1.prototype, "create", null);
-__decorate([
-    version({ since: '0.0.0' })
-], AccountRepository$1.prototype, "verifyCredentials", null);
-__decorate([
-    version({ since: '0.0.0' })
-], AccountRepository$1.prototype, "updateCredentials", null);
-__decorate([
-    version({ since: '0.0.0' })
-], AccountRepository$1.prototype, "listFollowers", null);
-__decorate([
-    version({ since: '0.0.0' })
-], AccountRepository$1.prototype, "listFollowing", null);
-__decorate([
-    version({ since: '0.0.0' })
-], AccountRepository$1.prototype, "listStatuses", null);
-__decorate([
-    version({ since: '0.0.0' })
-], AccountRepository$1.prototype, "follow", null);
-__decorate([
-    version({ since: '0.0.0' })
-], AccountRepository$1.prototype, "unfollow", null);
-__decorate([
-    version({ since: '0.0.0' })
-], AccountRepository$1.prototype, "fetchRelationships", null);
-__decorate([
-    version({ since: '0.0.0' })
-], AccountRepository$1.prototype, "search", null);
-__decorate([
-    version({ since: '0.0.0' })
-], AccountRepository$1.prototype, "block", null);
-__decorate([
-    version({ since: '0.0.0' })
-], AccountRepository$1.prototype, "unblock", null);
-__decorate([
-    version({ since: '2.5.0' })
-], AccountRepository$1.prototype, "pin", null);
-__decorate([
-    version({ since: '2.5.0' })
-], AccountRepository$1.prototype, "unpin", null);
-__decorate([
-    version({ since: '2.1.0' })
-], AccountRepository$1.prototype, "listLists", null);
-__decorate([
-    version({ since: '0.0.0' })
-], AccountRepository$1.prototype, "mute", null);
-__decorate([
-    version({ since: '0.0.0' })
-], AccountRepository$1.prototype, "unmute", null);
-__decorate([
-    version({ since: '3.2.0' })
-], AccountRepository$1.prototype, "createNote", null);
-__decorate([
-    version({ since: '3.3.0' })
-], AccountRepository$1.prototype, "listFeaturedTags", null);
-__decorate([
-    version({ since: '2.8.0' })
-], AccountRepository$1.prototype, "listIdentityProofs", null);
-__decorate([
-    version({ since: '3.4.0' })
-], AccountRepository$1.prototype, "lookup", null);
-__decorate([
-    version({ since: '3.5.0' })
-], AccountRepository$1.prototype, "fetchFamiliarFollowers", null);
-__decorate([
-    version({ since: '3.5.0' })
-], AccountRepository$1.prototype, "removeFromFollowers", null);
+    const transformChunk = (_chunk, _callback) => {
+      const chunkSize = Buffer.byteLength(_chunk);
+      let chunkRemainder = null;
+      let maxChunkSize = readableHighWaterMark;
+      let bytesLeft;
+      let passed = 0;
 
-/**
- * Decorator that verifies the version of the Mastodon instance
- * @param parameters Optional params
- */
-const deprecated = (message) => (_target, name, descriptor) => {
-    const origin = descriptor.value;
-    if (origin == undefined) {
-        throw new MastoUnexpectedError('deprecated can only apply to a method of a class');
-    }
-    descriptor.value = function (...args) {
-        var _a, _b;
-        if ((_a = this.config) === null || _a === void 0 ? void 0 : _a.shouldWarnDeprecated()) {
-            (_b = this.logger) === null || _b === void 0 ? void 0 : _b.warn(`#${name.toString()} is deprecated. ${message}`);
+      if (maxRate) {
+        const now = Date.now();
+
+        if (!internals.ts || (passed = (now - internals.ts)) >= timeWindow) {
+          internals.ts = now;
+          bytesLeft = bytesThreshold - internals.bytes;
+          internals.bytes = bytesLeft < 0 ? -bytesLeft : 0;
+          passed = 0;
         }
-        return origin.apply(this, args);
+
+        bytesLeft = bytesThreshold - internals.bytes;
+      }
+
+      if (maxRate) {
+        if (bytesLeft <= 0) {
+          // next time window
+          return setTimeout(() => {
+            _callback(null, _chunk);
+          }, timeWindow - passed);
+        }
+
+        if (bytesLeft < maxChunkSize) {
+          maxChunkSize = bytesLeft;
+        }
+      }
+
+      if (maxChunkSize && chunkSize > maxChunkSize && (chunkSize - maxChunkSize) > minChunkSize) {
+        chunkRemainder = _chunk.subarray(maxChunkSize);
+        _chunk = _chunk.subarray(0, maxChunkSize);
+      }
+
+      pushChunk(_chunk, chunkRemainder ? () => {
+        process.nextTick(_callback, null, chunkRemainder);
+      } : _callback);
     };
-};
 
-class StreamRepository {
-    constructor(ws, config, logger) {
-        this.ws = ws;
-        this.config = config;
-        this.logger = logger;
+    transformChunk(chunk, function transformNextChunk(err, _chunk) {
+      if (err) {
+        return callback(err);
+      }
+
+      if (_chunk) {
+        transformChunk(_chunk, transformNextChunk);
+      } else {
+        callback(null);
+      }
+    });
+  }
+
+  setLength(length) {
+    this[kInternals].length = +length;
+    return this;
+  }
+}
+
+const isBrotliSupported = utils.isFunction(zlib__default["default"].createBrotliDecompress);
+
+const {http: httpFollow, https: httpsFollow} = followRedirects__default["default"];
+
+const isHttps = /https:?/;
+
+const supportedProtocols = platform.protocols.map(protocol => {
+  return protocol + ':';
+});
+
+/**
+ * If the proxy or config beforeRedirects functions are defined, call them with the options
+ * object.
+ *
+ * @param {Object<string, any>} options - The options object that was passed to the request.
+ *
+ * @returns {Object<string, any>}
+ */
+function dispatchBeforeRedirect(options) {
+  if (options.beforeRedirects.proxy) {
+    options.beforeRedirects.proxy(options);
+  }
+  if (options.beforeRedirects.config) {
+    options.beforeRedirects.config(options);
+  }
+}
+
+/**
+ * If the proxy or config afterRedirects functions are defined, call them with the options
+ *
+ * @param {http.ClientRequestArgs} options
+ * @param {AxiosProxyConfig} configProxy configuration from Axios options object
+ * @param {string} location
+ *
+ * @returns {http.ClientRequestArgs}
+ */
+function setProxy(options, configProxy, location) {
+  let proxy = configProxy;
+  if (!proxy && proxy !== false) {
+    const proxyUrl = proxyFromEnv.getProxyForUrl(location);
+    if (proxyUrl) {
+      proxy = new URL(proxyUrl);
     }
-    /**
-     * Starting home timeline and notification streaming
-     * @return Instance of EventEmitter
-     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
-     */
-    streamUser() {
-        return this.ws.stream('/api/v1/streaming', {
-            stream: 'user',
+  }
+  if (proxy) {
+    // Basic proxy authorization
+    if (proxy.username) {
+      proxy.auth = (proxy.username || '') + ':' + (proxy.password || '');
+    }
+
+    if (proxy.auth) {
+      // Support proxy auth object form
+      if (proxy.auth.username || proxy.auth.password) {
+        proxy.auth = (proxy.auth.username || '') + ':' + (proxy.auth.password || '');
+      }
+      const base64 = Buffer
+        .from(proxy.auth, 'utf8')
+        .toString('base64');
+      options.headers['Proxy-Authorization'] = 'Basic ' + base64;
+    }
+
+    options.headers.host = options.hostname + (options.port ? ':' + options.port : '');
+    const proxyHost = proxy.hostname || proxy.host;
+    options.hostname = proxyHost;
+    // Replace 'host' since options is not a URL object
+    options.host = proxyHost;
+    options.port = proxy.port;
+    options.path = location;
+    if (proxy.protocol) {
+      options.protocol = proxy.protocol.includes(':') ? proxy.protocol : `${proxy.protocol}:`;
+    }
+  }
+
+  options.beforeRedirects.proxy = function beforeRedirect(redirectOptions) {
+    // Configure proxy for redirected request, passing the original config proxy to apply
+    // the exact same logic as if the redirected request was performed by axios directly.
+    setProxy(redirectOptions, configProxy, redirectOptions.href);
+  };
+}
+
+/*eslint consistent-return:0*/
+function httpAdapter(config) {
+  return new Promise(function dispatchHttpRequest(resolvePromise, rejectPromise) {
+    let data = config.data;
+    const responseType = config.responseType;
+    const responseEncoding = config.responseEncoding;
+    const method = config.method.toUpperCase();
+    let isFinished;
+    let isDone;
+    let rejected = false;
+    let req;
+
+    // temporary internal emitter until the AxiosRequest class will be implemented
+    const emitter = new EventEmitter__default["default"]();
+
+    function onFinished() {
+      if (isFinished) return;
+      isFinished = true;
+
+      if (config.cancelToken) {
+        config.cancelToken.unsubscribe(abort);
+      }
+
+      if (config.signal) {
+        config.signal.removeEventListener('abort', abort);
+      }
+
+      emitter.removeAllListeners();
+    }
+
+    function done(value, isRejected) {
+      if (isDone) return;
+
+      isDone = true;
+
+      if (isRejected) {
+        rejected = true;
+        onFinished();
+      }
+
+      isRejected ? rejectPromise(value) : resolvePromise(value);
+    }
+
+    const resolve = function resolve(value) {
+      done(value);
+    };
+
+    const reject = function reject(value) {
+      done(value, true);
+    };
+
+    function abort(reason) {
+      emitter.emit('abort', !reason || reason.type ? new CanceledError(null, config, req) : reason);
+    }
+
+    emitter.once('abort', reject);
+
+    if (config.cancelToken || config.signal) {
+      config.cancelToken && config.cancelToken.subscribe(abort);
+      if (config.signal) {
+        config.signal.aborted ? abort() : config.signal.addEventListener('abort', abort);
+      }
+    }
+
+    // Parse url
+    const fullPath = buildFullPath(config.baseURL, config.url);
+    const parsed = new URL(fullPath);
+    const protocol = parsed.protocol || supportedProtocols[0];
+
+    if (protocol === 'data:') {
+      let convertedData;
+
+      if (method !== 'GET') {
+        return settle(resolve, reject, {
+          status: 405,
+          statusText: 'method not allowed',
+          headers: {},
+          config
         });
-    }
-    /**
-     * Starting federated timeline streaming
-     * @return Instance of EventEmitter
-     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
-     */
-    streamPublicTimeline() {
-        return this.ws.stream('/api/v1/streaming', {
-            stream: 'public',
+      }
+
+      try {
+        convertedData = fromDataURI(config.url, responseType === 'blob', {
+          Blob: config.env && config.env.Blob
         });
-    }
-    /**
-     * Starting local timeline streaming
-     * @return Instance of EventEmitter
-     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
-     */
-    streamCommunityTimeline() {
-        return this.ws.stream('/api/v1/streaming', {
-            stream: 'public:local',
-        });
-    }
-    /**
-     * Stream remote public timeline
-     * @return Instance of EventEmitter
-     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
-     */
-    streamRemotePublicTimeline() {
-        return this.ws.stream('/api/v1/streaming', {
-            stream: 'public:remote',
-        });
-    }
-    /**
-     * Starting tag timeline streaming
-     * @param id ID of the tag
-     * @return Instance of EventEmitter
-     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
-     */
-    streamTagTimeline(id) {
-        return this.ws.stream('/api/v1/streaming', {
-            stream: 'hashtag',
-            tag: id,
-        });
-    }
-    /**
-     * Starting local tag timeline streaming
-     * @param id ID of the tag
-     * @return Instance of EventEmitter
-     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
-     */
-    streamLocalTagTimeline(id) {
-        return this.ws.stream('/api/v1/streaming', {
-            stream: 'hashtag:local',
-            tag: id,
-        });
-    }
-    /**
-     * Starting list timeline streaming
-     * @param id ID of the list
-     * @return Instance of EventEmitter
-     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
-     */
-    streamListTimeline(id) {
-        return this.ws.stream('/api/v1/streaming', {
-            stream: 'list',
-            list: id,
-        });
-    }
-    /**
-     * Starting direct timeline streaming
-     * @return Instance of EventEmitter
-     * @see https://docs.joinmastodon.org/methods/timelines/streaming/
-     */
-    streamDirectTimeline() {
-        return this.ws.stream('/api/v1/streaming', {
-            stream: 'direct',
-        });
-    }
-}
-__decorate([
-    version({ since: '0.0.0' })
-], StreamRepository.prototype, "streamUser", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StreamRepository.prototype, "streamPublicTimeline", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StreamRepository.prototype, "streamCommunityTimeline", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StreamRepository.prototype, "streamRemotePublicTimeline", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StreamRepository.prototype, "streamTagTimeline", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StreamRepository.prototype, "streamLocalTagTimeline", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StreamRepository.prototype, "streamListTimeline", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StreamRepository.prototype, "streamDirectTimeline", null);
+      } catch (err) {
+        throw AxiosError.from(err, AxiosError.ERR_BAD_REQUEST, config);
+      }
 
-class AnnouncementRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Fetch announcements
-     * @return Announcements
-     * @see https://docs.joinmastodon.org/methods/announcements/
-     */
-    list() {
-        return new Paginator(this.http, '/api/v1/announcements');
-    }
-    /**
-     * Dismiss announcement
-     * @param id ID of the announcement
-     * @return Nothing
-     * @see https://docs.joinmastodon.org/methods/announcements/
-     */
-    dismiss(id) {
-        return this.http.post(`/api/v1/announcements/${id}/dismiss`);
-    }
-    /**
-     * Add a reaction to an announcement
-     * @param id ID of the announcement
-     * @param name Emoji string
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/announcements/
-     */
-    addReaction(id, name) {
-        return this.http.put(`/api/v1/announcements/${id}/reactions/${name}`);
-    }
-    /**
-     * Remove a reaction from an announcement
-     * @param id ID of the announcement
-     * @param name Emoji string
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/announcements/
-     */
-    removeReaction(id, name) {
-        return this.http.delete(`/api/v1/announcements/${id}/reactions/${name}`);
-    }
-}
-__decorate([
-    version({ since: '3.1.0' })
-], AnnouncementRepository.prototype, "list", null);
-__decorate([
-    version({ since: '3.1.0' })
-], AnnouncementRepository.prototype, "dismiss", null);
-__decorate([
-    version({ since: '3.1.0' })
-], AnnouncementRepository.prototype, "addReaction", null);
-__decorate([
-    version({ since: '3.1.0' })
-], AnnouncementRepository.prototype, "removeReaction", null);
+      if (responseType === 'text') {
+        convertedData = convertedData.toString(responseEncoding);
 
-class AppRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Create a new application to obtain OAuth2 credentials.
-     * @param params Parameters
-     * @return Returns App with `client_id` and `client_secret`
-     * @see https://docs.joinmastodon.org/methods/apps/
-     */
-    create(params) {
-        return this.http.post(`/api/v1/apps`, params);
-    }
-    /**
-     * Confirm that the app's OAuth2 credentials work.
-     * @return Application
-     * @see https://docs.joinmastodon.org/methods/apps/
-     */
-    verifyCredentials() {
-        return this.http.get(`/api/v1/apps/verify_credentials`);
-    }
-}
-__decorate([
-    version({ since: '0.0.0' })
-], AppRepository.prototype, "create", null);
-__decorate([
-    version({ since: '2.0.0' })
-], AppRepository.prototype, "verifyCredentials", null);
-
-class BlockRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Blocked users
-     * @param params Array of Account
-     * @return Query parameter
-     * @see https://docs.joinmastodon.org/methods/accounts/blocks/
-     */
-    list(params = {}) {
-        return new Paginator(this.http, `/api/v1/blocks`, params);
-    }
-}
-__decorate([
-    version({ since: '0.0.0' })
-], BlockRepository.prototype, "list", null);
-
-class BookmarkRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Statuses the user has bookmarked.
-     * @param params Parameters
-     * @return Array of Statuses
-     * @see https://docs.joinmastodon.org/methods/accounts/bookmarks/
-     */
-    list(params = {}) {
-        return new Paginator(this.http, '/api/v1/bookmarks', params);
-    }
-}
-__decorate([
-    version({ since: '3.1.0' })
-], BookmarkRepository.prototype, "list", null);
-
-class ConversationRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Show conversation
-     * @param params Parameters
-     * @return Array of Conversation
-     * @see https://docs.joinmastodon.org/methods/timelines/conversations/
-     */
-    list(params = {}) {
-        return new Paginator(this.http, '/api/v1/conversations', params);
-    }
-    /**
-     * Remove conversation
-     * @param id ID of the conversation in the database
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/timelines/conversations/
-     */
-    remove(id) {
-        return this.http.delete(`/api/v1/conversations/${id}`);
-    }
-    /**
-     * Mark as read
-     * @param id ID of the conversation in the database
-     * @return Conversation
-     * @see https://docs.joinmastodon.org/methods/timelines/conversations/
-     */
-    read(id) {
-        return this.http.post(`/api/v1/conversations/${id}/read`);
-    }
-}
-__decorate([
-    version({ since: '2.6.0' })
-], ConversationRepository.prototype, "list", null);
-__decorate([
-    version({ since: '2.6.0' })
-], ConversationRepository.prototype, "remove", null);
-__decorate([
-    version({ since: '2.6.0' })
-], ConversationRepository.prototype, "read", null);
-
-class CustomEmojiRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Returns custom emojis that are available on the server.
-     * @return Array of Emoji
-     * @see https://docs.joinmastodon.org/methods/instance/custom_emojis/
-     */
-    list() {
-        return new Paginator(this.http, `/api/v1/custom_emojis`);
-    }
-}
-__decorate([
-    version({ since: '2.0.0' })
-], CustomEmojiRepository.prototype, "list", null);
-
-class DirectoryRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * List accounts visible in the directory.
-     * @param params Parameters
-     * @return Array of Account
-     * @see https://docs.joinmastodon.org/methods/instance/directory/
-     */
-    list(params) {
-        return new Paginator(this.http, '/api/v1/directory', params);
-    }
-}
-__decorate([
-    version({ since: '3.0.0' })
-], DirectoryRepository.prototype, "list", null);
-
-let DomainBlockRepository$1 = class DomainBlockRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * View domains the user has blocked.
-     * @param params Parameters
-     * @return Array of strings
-     * @see https://docs.joinmastodon.org/methods/accounts/domain_blocks/
-     */
-    list(params) {
-        return new Paginator(this.http, `/api/v1/domain_blocks`, params);
-    }
-    /**
-     * Block a domain to:
-     * - hide all public posts from it
-     * - hide all notifications from it
-     * - remove all followers from it
-     * - prevent following new users from it (but does not remove existing follows)
-     * @param domain Domain to block.
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/accounts/domain_blocks/
-     */
-    block(domain) {
-        return this.http.post(`/api/v1/domain_blocks`, {
-            domain,
-        });
-    }
-    /**
-     * Remove a domain block, if it exists in the user's array of blocked domains.
-     * @param domain Domain to unblock
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/accounts/domain_blocks/
-     */
-    unblock(domain) {
-        return this.http.delete(`/api/v1/domain_blocks`, {
-            domain,
-        });
-    }
-};
-__decorate([
-    version({ since: '1.4.0' })
-], DomainBlockRepository$1.prototype, "list", null);
-__decorate([
-    version({ since: '1.4.0' })
-], DomainBlockRepository$1.prototype, "block", null);
-__decorate([
-    version({ since: '1.4.0' })
-], DomainBlockRepository$1.prototype, "unblock", null);
-
-class EndorsementRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Accounts that the user is currently featuring on their profile.
-     * @return Array of Account
-     * @see https://docs.joinmastodon.org/methods/accounts/endorsements/
-     */
-    list(params) {
-        return new Paginator(this.http, `/api/v1/endorsements`, params);
-    }
-}
-__decorate([
-    version({ since: '2.5.0' })
-], EndorsementRepository.prototype, "list", null);
-
-class FavouriteRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Statuses the user has favourited.
-     * @param params Parameters
-     * @return Array of Status
-     * @see https://docs.joinmastodon.org/methods/accounts/favourites/
-     */
-    list(params) {
-        return new Paginator(this.http, `/api/v1/favourites`, params);
-    }
-}
-__decorate([
-    version({ since: '0.0.0' })
-], FavouriteRepository.prototype, "list", null);
-
-class FeaturedTagRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * View your featured tags
-     * @return Array of FeaturedTag
-     * @see https://docs.joinmastodon.org/methods/accounts/featured_tags/
-     * @done
-     */
-    list() {
-        return new Paginator(this.http, '/api/v1/featured_tags');
-    }
-    /**
-     * Feature a tag
-     * @param params Parameters
-     * @return FeaturedTag
-     * @see https://docs.joinmastodon.org/methods/accounts/featured_tags/
-     */
-    create(params) {
-        return this.http.post('/api/v1/featured_tags', params);
-    }
-    /**
-     * Shows your 10 most-used tags, with usage history for the past week.
-     * @return Array of Tag with History
-     * @see https://docs.joinmastodon.org/methods/accounts/featured_tags/
-     */
-    listSuggestions() {
-        return new Paginator(this.http, '/api/v1/featured_tags/suggestions');
-    }
-    /**
-     * Un-feature a tag
-     * @param id The id of the FeaturedTag to be un-featured
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/accounts/featured_tags/
-     */
-    remove(id) {
-        return this.http.delete(`/api/v1/featured_tags/${id}`);
-    }
-}
-__decorate([
-    version({ since: '3.0.0' })
-], FeaturedTagRepository.prototype, "list", null);
-__decorate([
-    version({ since: '3.0.0' })
-], FeaturedTagRepository.prototype, "create", null);
-__decorate([
-    version({ since: '3.0.0' })
-], FeaturedTagRepository.prototype, "listSuggestions", null);
-__decorate([
-    version({ since: '3.0.0' })
-], FeaturedTagRepository.prototype, "remove", null);
-
-let FilterRepository$1 = class FilterRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * View all filters
-     * @return Filter
-     * @see https://docs.joinmastodon.org/methods/accounts/filters/
-     */
-    list() {
-        return new Paginator(this.http, `/api/v1/filters`);
-    }
-    /**
-     * View a single filter
-     * @param id ID of the filter
-     * @return Returns Filter
-     * @see https://docs.joinmastodon.org/methods/accounts/filters/
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/filters/${id}`);
-    }
-    /**
-     * Create a filter
-     * @param params Parameters
-     * @return Filter
-     * @see https://docs.joinmastodon.org/methods/accounts/filters/
-     */
-    create(params) {
-        return this.http.post(`/api/v1/filters`, params);
-    }
-    /**
-     * Update a filter
-     * @param id ID of the filter in the database
-     * @param params Parameters
-     * @return Filter
-     * @see https://docs.joinmastodon.org/methods/accounts/filters/
-     */
-    update(id, params) {
-        return this.http.put(`/api/v1/filters/${id}`, params);
-    }
-    /**
-     * Remove a filter
-     * @param id ID of the filter in the database
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/accounts/filters/
-     */
-    remove(id) {
-        return this.http.delete(`/api/v1/filters/${id}`);
-    }
-};
-__decorate([
-    version({ since: '2.4.3' })
-], FilterRepository$1.prototype, "list", null);
-__decorate([
-    version({ since: '2.4.3' })
-], FilterRepository$1.prototype, "fetch", null);
-__decorate([
-    version({ since: '2.4.3' })
-], FilterRepository$1.prototype, "create", null);
-__decorate([
-    version({ since: '2.4.3' })
-], FilterRepository$1.prototype, "update", null);
-__decorate([
-    version({ since: '2.4.3' })
-], FilterRepository$1.prototype, "remove", null);
-
-class FollowRequestRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Pending Follows
-     * @param params Parameters
-     * @return Array of Account
-     * @see https://docs.joinmastodon.org/methods/accounts/follow_requests/
-     */
-    list(params) {
-        return new Paginator(this.http, `/api/v1/follow_requests`, params);
-    }
-    /**
-     * Accept Follow
-     * @param id ID of the account in the database
-     * @return Relationship
-     * @see https://docs.joinmastodon.org/methods/accounts/follow_requests/
-     */
-    authorize(id) {
-        return this.http.post(`/api/v1/follow_requests/${id}/authorize`);
-    }
-    /**
-     * Reject Follow
-     * @param id ID of the account in the database
-     * @return Relationship
-     * @see https://docs.joinmastodon.org/methods/accounts/follow_requests/
-     */
-    reject(id) {
-        return this.http.post(`/api/v1/follow_requests/${id}/reject`);
-    }
-}
-__decorate([
-    version({ since: '0.0.0' })
-], FollowRequestRepository.prototype, "list", null);
-__decorate([
-    version({ since: '0.0.0' })
-], FollowRequestRepository.prototype, "authorize", null);
-__decorate([
-    version({ since: '0.0.0' })
-], FollowRequestRepository.prototype, "reject", null);
-
-let InstanceRepository$1 = class InstanceRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Information about the server.
-     * @return Instance
-     * @see https://docs.joinmastodon.org/methods/instance/
-     */
-    fetch() {
-        return this.http.get('/api/v1/instance');
-    }
-    /**
-     * Domains that this instance is aware of.
-     * @return Array of Activity
-     * @see https://docs.joinmastodon.org/methods/instance/
-     */
-    listPeers() {
-        return new Paginator(this.http, '/api/v1/instance/peers');
-    }
-    /**
-     * Instance activity over the last 3 months, binned weekly.
-     * @return Array of Activity
-     * @see https://docs.joinmastodon.org/methods/instance/
-     */
-    listActivities() {
-        return new Paginator(this.http, '/api/v1/instance/activity');
-    }
-};
-__decorate([
-    version({ since: '1.0.0' })
-], InstanceRepository$1.prototype, "fetch", null);
-__decorate([
-    version({ since: '2.1.2' })
-], InstanceRepository$1.prototype, "listPeers", null);
-__decorate([
-    version({ since: '2.1.2' })
-], InstanceRepository$1.prototype, "listActivities", null);
-
-class ListRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Fetch the list with the given ID. Used for verifying the title of a list.
-     * @param id ID of the list in the database
-     * @return List
-     * @see https://docs.joinmastodon.org/methods/timelines/lists/
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/lists/${id}`);
-    }
-    /**
-     * Fetch all lists that the user owns.
-     * @return Array of List
-     * @see https://docs.joinmastodon.org/methods/timelines/lists/
-     */
-    list() {
-        return new Paginator(this.http, '/api/v1/lists');
-    }
-    /**
-     * Create a new list.
-     * @param params Parameters
-     * @return List
-     * @see https://docs.joinmastodon.org/methods/timelines/lists/
-     */
-    create(params) {
-        return this.http.post('/api/v1/lists', params);
-    }
-    /**
-     * Change the title of a list.
-     * @param id ID of the list in the database
-     * @param params Parameters
-     * @return List
-     * @see https://docs.joinmastodon.org/methods/timelines/lists/
-     */
-    update(id, params) {
-        return this.http.put(`/api/v1/lists/${id}`, params);
-    }
-    /**
-     * Delete a list
-     * @param id ID of the list in the database
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/timelines/lists/
-     */
-    remove(id) {
-        return this.http.delete(`/api/v1/lists/${id}`);
-    }
-    /**
-     * View accounts in list
-     * @param id ID of the list in the database
-     * @param params Parameters
-     * @return Array of Account
-     * @see https://docs.joinmastodon.org/methods/timelines/lists/
-     */
-    listAccounts(id, params) {
-        return new Paginator(this.http, `/api/v1/lists/${id}/accounts`, params);
-    }
-    /**
-     * Add accounts to the given list. Note that the user must be following these accounts.
-     * @param id ID of the list in the database
-     * @param params Parameters
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/timelines/lists/
-     */
-    addAccount(id, params) {
-        return this.http.post(`/api/v1/lists/${id}/accounts`, params);
-    }
-    /**
-     * Remove accounts from the given list.
-     * @param id ID of the list in the database
-     * @param params Parameters
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/timelines/lists/
-     */
-    removeAccount(id, params) {
-        return this.http.delete(`/api/v1/lists/${id}/accounts`, params);
-    }
-}
-__decorate([
-    version({ since: '2.1.0' })
-], ListRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '2.1.0' })
-], ListRepository.prototype, "list", null);
-__decorate([
-    version({ since: '2.1.0' })
-], ListRepository.prototype, "create", null);
-__decorate([
-    version({ since: '2.1.0' })
-], ListRepository.prototype, "update", null);
-__decorate([
-    version({ since: '2.1.0' })
-], ListRepository.prototype, "remove", null);
-__decorate([
-    version({ since: '2.1.0' })
-], ListRepository.prototype, "listAccounts", null);
-__decorate([
-    version({ since: '2.1.0' })
-], ListRepository.prototype, "addAccount", null);
-__decorate([
-    version({ since: '2.1.0' })
-], ListRepository.prototype, "removeAccount", null);
-
-class MarkerRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Get saved timeline position
-     * @param params Parameters
-     * @return Markers
-     * @see https://docs.joinmastodon.org/methods/timelines/markers/
-     */
-    fetch(params) {
-        return this.http.get('/api/v1/markers', params);
-    }
-    /**
-     * Save position in timeline
-     * @param params Parameters
-     * @return Markers
-     * @see https://github.com/tootsuite/mastodon/pull/11762
-     */
-    create(params) {
-        return this.http.post('/api/v1/markers', params);
-    }
-}
-__decorate([
-    version({ since: '3.0.0' })
-], MarkerRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '3.0.0' })
-], MarkerRepository.prototype, "create", null);
-
-let MediaAttachmentRepository$1 = class MediaAttachmentRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Creates an attachment to be used with a new status.
-     * @param params Parameters
-     * @return Attachment
-     * @see https://docs.joinmastodon.org/methods/statuses/media/
-     */
-    create(params) {
-        return this.http.post(`/api/v1/media`, params, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-        });
-    }
-    /**
-     * Fetches an attachment to be used with a new status.
-     * @param id ID of the attachment
-     * @see https://github.com/tootsuite/mastodon/pull/13210
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/media/${id}`);
-    }
-    /**
-     * Update an Attachment, before it is attached to a status and posted.
-     * @param id The id of the Attachment entity to be updated
-     * @param params Parameters
-     * @return Attachment
-     * @see https://docs.joinmastodon.org/methods/statuses/media/
-     */
-    update(id, params) {
-        return this.http.put(`/api/v1/media/${id}`, params, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-        });
-    }
-};
-__decorate([
-    deprecated('Use MastoClient.v2.media.create instead'),
-    version({ since: '0.0.0', until: '3.1.3' })
-], MediaAttachmentRepository$1.prototype, "create", null);
-__decorate([
-    version({ since: '3.1.3' })
-], MediaAttachmentRepository$1.prototype, "fetch", null);
-__decorate([
-    version({ since: '0.0.0' })
-], MediaAttachmentRepository$1.prototype, "update", null);
-
-class MuteRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Accounts the user has muted.
-     * @param params Parameters
-     * @return Array of Account
-     * @see https://docs.joinmastodon.org/methods/accounts/mutes/
-     */
-    list(params) {
-        return new Paginator(this.http, '/api/v1/mutes', params);
-    }
-}
-__decorate([
-    version({ since: '0.0.0' })
-], MuteRepository.prototype, "list", null);
-
-class NotificationRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Notifications concerning the user.
-     * This API returns Link headers containing links to the next/previous page.
-     * However, the links can also be constructed dynamically using query params and `id` values.
-     * @param params Query parameter
-     * @return Array of Notification
-     * @see https://docs.joinmastodon.org/methods/notifications/
-     */
-    list(params) {
-        return new Paginator(this.http, '/api/v1/notifications', params);
-    }
-    /**
-     * View information about a notification with a given ID.
-     * @param id ID of the notification in the database.
-     * @return Notification
-     * @see https://docs.joinmastodon.org/methods/notifications/
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/notifications/${id}`);
-    }
-    /**
-     * Clear all notifications from the server.
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/notifications/
-     */
-    clear() {
-        return this.http.post('/api/v1/notifications/clear');
-    }
-    /**
-     * Clear a single notification from the server.
-     * @param id ID of the notification to be cleared
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/notifications/
-     */
-    dismiss(id) {
-        return this.http.post(`/api/v1/notifications/${id}/dismiss`);
-    }
-}
-__decorate([
-    version({ since: '0.0.0' })
-], NotificationRepository.prototype, "list", null);
-__decorate([
-    version({ since: '0.0.0' })
-], NotificationRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '0.0.0' })
-], NotificationRepository.prototype, "clear", null);
-__decorate([
-    version({ since: '2.6.0' })
-], NotificationRepository.prototype, "dismiss", null);
-
-class PollRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * View a poll
-     * @param id ID of the poll in the database
-     * @return Poll
-     * @see https://docs.joinmastodon.org/methods/statuses/polls/
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/polls/${id}`);
-    }
-    /**
-     * Vote on a poll
-     * @param id ID of the poll in the database
-     * @param params Parameters
-     * @return Poll
-     * @see https://docs.joinmastodon.org/methods/statuses/polls/
-     */
-    vote(id, params) {
-        return this.http.post(`/api/v1/polls/${id}/votes`, params);
-    }
-}
-__decorate([
-    version({ since: '2.8.0' })
-], PollRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '2.8.0' })
-], PollRepository.prototype, "vote", null);
-
-class PreferenceRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Preferences defined by the user in their account settings.
-     * @return Preferences by key and value
-     * @see https://docs.joinmastodon.org/methods/accounts/preferences/
-     */
-    fetch() {
-        return this.http.get('/api/v1/preferences');
-    }
-}
-__decorate([
-    version({ since: '2.8.0' })
-], PreferenceRepository.prototype, "fetch", null);
-
-class WebPushSubscriptionRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Add a Web Push API subscription to receive notifications.
-     * Each access token can have one push subscription.
-     * If you create a new subscription, the old subscription is deleted.
-     * @param params Parameters
-     * @return Returns Push Subscription
-     * @see https://docs.joinmastodon.org/methods/notifications/push/
-     */
-    create(params) {
-        return this.http.post('/api/v1/push/subscription', params);
-    }
-    /**
-     * View the PushSubscription currently associated with this access token.
-     * @return PushSubscription
-     * @see https://docs.joinmastodon.org/methods/notifications/push/
-     */
-    fetch() {
-        return this.http.get('/api/v1/push/subscription');
-    }
-    /**
-     * Updates the current push subscription. Only the data part can be updated. To change fundamentals, a new subscription must be created instead.
-     * @param params Parameters
-     * @return PushSubscription
-     * @see https://docs.joinmastodon.org/methods/notifications/push/
-     */
-    update(params) {
-        return this.http.put('/api/v1/push/subscription', params);
-    }
-    /**
-     * Removes the current Web Push API subscription.
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/notifications/push/
-     */
-    remove() {
-        return this.http.delete('/api/v1/push/subscription');
-    }
-}
-__decorate([
-    version({ since: '2.4.0' })
-], WebPushSubscriptionRepository.prototype, "create", null);
-__decorate([
-    version({ since: '2.4.0' })
-], WebPushSubscriptionRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '2.4.0' })
-], WebPushSubscriptionRepository.prototype, "update", null);
-__decorate([
-    version({ since: '2.4.0' })
-], WebPushSubscriptionRepository.prototype, "remove", null);
-
-let ReportRepository$1 = class ReportRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * File a report
-     * @param params Parameters
-     * @return Report
-     * @see https://docs.joinmastodon.org/methods/accounts/reports/
-     */
-    create(params) {
-        return this.http.post('/api/v1/reports', params);
-    }
-};
-__decorate([
-    version({ since: '1.1.0' })
-], ReportRepository$1.prototype, "create", null);
-
-class ScheduledStatusRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * View scheduled statuses
-     * @param params Parameters
-     * @return Array of ScheduledStatus
-     * @see https://docs.joinmastodon.org/methods/statuses/scheduled_statuses/
-     */
-    list(params) {
-        return new Paginator(this.http, '/api/v1/scheduled_statuses', params);
-    }
-    /**
-     * View a single scheduled status
-     * @param id ID of the scheduled status in the database.
-     * @return ScheduledStatus
-     * @see https://docs.joinmastodon.org/methods/statuses/scheduled_statuses/
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/scheduled_statuses/${id}`);
-    }
-    /**
-     * Update Scheduled status
-     * @param id ID of the Status to be scheduled
-     * @param params Parameters
-     * @return ScheduledStatus
-     * @see https://docs.joinmastodon.org/api/rest/scheduled-statuses/#put-api-v1-scheduled-statuses-id
-     */
-    update(id, params) {
-        return this.http.put(`/api/v1/scheduled_statuses/${id}`, params);
-    }
-    /**
-     * Cancel a scheduled status
-     * @param id ID of the scheduled status in the database.
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/statuses/scheduled_statuses/
-     */
-    remove(id) {
-        return this.http.delete(`/api/v1/scheduled_statuses/${id}`);
-    }
-}
-__decorate([
-    version({ since: '2.7.0' })
-], ScheduledStatusRepository.prototype, "list", null);
-__decorate([
-    version({ since: '2.7.0' })
-], ScheduledStatusRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '2.7.0' })
-], ScheduledStatusRepository.prototype, "update", null);
-__decorate([
-    version({ since: '2.7.0' })
-], ScheduledStatusRepository.prototype, "remove", null);
-
-class StatusRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * View information about a status.
-     * @param id Local ID of a status in the database.
-     * @return Status
-     * @see https://docs.joinmastodon.org/methods/statuses/
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/statuses/${id}`);
-    }
-    create(params, extra = {}) {
-        if (extra.idempotencyKey) {
-            return this.http.post('/api/v1/statuses', params, {
-                headers: { 'Idempotency-Key': extra.idempotencyKey },
-            });
+        if (!responseEncoding || responseEncoding === 'utf8') {
+          data = utils.stripBOM(convertedData);
         }
-        return this.http.post('/api/v1/statuses', params);
-    }
-    /**
-     * Update a status
-     * @param params Parameters
-     * @return Status. When scheduled_at is present, ScheduledStatus is returned instead.
-     * @see https://docs.joinmastodon.org/api/rest/statuses/#post-api-v1-statuses
-     */
-    update(id, params) {
-        return this.http.put(`/api/v1/statuses/${id}`, params);
-    }
-    /**
-     * Delete one of your own statuses.
-     * @param id Local ID of a status in the database. Must be owned by authenticated account.
-     * @return Status with source text and `media_attachments` or `poll`
-     * @see https://docs.joinmastodon.org/methods/statuses/
-     */
-    remove(id) {
-        return this.http.delete(`/api/v1/statuses/${id}`);
-    }
-    /**
-     * View statuses above and below this status in the thread.
-     * @param id Local ID of a status in the database.
-     * @return Context
-     * @see https://docs.joinmastodon.org/methods/statuses/
-     */
-    fetchContext(id) {
-        return this.http.get(`/api/v1/statuses/${id}/context`);
-    }
-    /**
-     * Preview card
-     * @deprecated Use `card` attribute of status instead
-     * @param id ID of the status in the database
-     * @return Card
-     * @see https://docs.joinmastodon.org/api/rest/statuses/#get-api-v1-statuses-id-card
-     */
-    fetchCard(id) {
-        return this.http.get(`/api/v1/statuses/${id}/card`);
-    }
-    /**
-     * Add a status to your favourites list.
-     * @param id Local ID of a status in the database.
-     * @return Status
-     * @see https://docs.joinmastodon.org/methods/statuses/
-     */
-    favourite(id) {
-        return this.http.post(`/api/v1/statuses/${id}/favourite`);
-    }
-    /**
-     * Remove a status from your favourites list.
-     * @param id Local ID of a status in the database.
-     * @return Status
-     * @see https://docs.joinmastodon.org/methods/statuses/
-     */
-    unfavourite(id) {
-        return this.http.post(`/api/v1/statuses/${id}/unfavourite`);
-    }
-    /**
-     * Do not receive notifications for the thread that this status is part of. Must be a thread in which you are a participant.
-     * @param id Local ID of a status in the database.
-     * @return Status
-     * @see https://docs.joinmastodon.org/methods/statuses/
-     */
-    mute(id) {
-        return this.http.post(`/api/v1/statuses/${id}/mute`);
-    }
-    /**
-     * Start receiving notifications again for the thread that this status is part of.
-     * @param id Local ID of a status in the database.
-     * @return Status
-     * @see https://docs.joinmastodon.org/methods/statuses/
-     */
-    unmute(id) {
-        return this.http.post(`/api/v1/statuses/${id}/unmute`);
-    }
-    /**
-     * View who boosted a given status.
-     * @param id Local ID of a status in the database.
-     * @return Array of Account
-     * @see https://docs.joinmastodon.org/methods/statuses/
-     */
-    listRebloggedBy(id) {
-        return new Paginator(this.http, `/api/v1/statuses/${id}/reblogged_by`);
-    }
-    /**
-     * View who favourited a given status.
-     * @param id Local ID of a status in the database.
-     * @return Array of Account
-     * @see https://docs.joinmastodon.org/methods/statuses/
-     */
-    listFavouritedBy(id) {
-        return new Paginator(this.http, `/api/v1/statuses/${id}/favourited_by`);
-    }
-    /**
-     * Re-share a status.
-     * @param id Local ID of a status in the database.
-     * @return Status
-     * @see https://docs.joinmastodon.org/api/rest/statuses/#post-api-v1-statuses-id-reblog
-     */
-    reblog(id, params) {
-        return this.http.post(`/api/v1/statuses/${id}/reblog`, params);
-    }
-    /**
-     * Undo a re-share of a status.
-     * @param id Local ID of a status in the database.
-     * @return Status
-     * @see https://docs.joinmastodon.org/methods/statuses/
-     */
-    unreblog(id) {
-        return this.http.post(`/api/v1/statuses/${id}/unreblog`);
-    }
-    /**
-     * Feature one of your own public statuses at the top of your profile.
-     * @param id Local ID of a status in the database. The status should be public and authored by the authorized account.
-     * @return Status
-     * @see https://docs.joinmastodon.org/methods/statuses/
-     */
-    pin(id) {
-        return this.http.post(`/api/v1/statuses/${id}/pin`);
-    }
-    /**
-     * Un-feature a status from the top of your profile.
-     * @param id Local ID of a status in the database.
-     * @return Status
-     * @see https://docs.joinmastodon.org/methods/statuses/
-     */
-    unpin(id) {
-        return this.http.post(`/api/v1/statuses/${id}/unpin`);
-    }
-    /**
-     * Privately bookmark a status.
-     * @param id ID of the status in the database
-     * @return Status
-     * @see https://docs.joinmastodon.org/methods/statuses/
-     */
-    bookmark(id) {
-        return this.http.post(`/api/v1/statuses/${id}/bookmark`);
-    }
-    /**
-     * Remove a status from your private bookmarks.
-     * @param id ID of the status in the database
-     * @return Status
-     * @see https://docs.joinmastodon.org/methods/statuses/
-     */
-    unbookmark(id) {
-        return this.http.post(`/api/v1/statuses/${id}/unbookmark`);
-    }
-    /**
-     * Get all known versions of a status, including the initial and current states.
-     * @param id The local id of the status in the database
-     * @returns StatusEdit
-     * @see https://docs.joinmastodon.org/methods/statuses/#history
-     */
-    listHistory(id) {
-        return new Paginator(this.http, `/api/v1/statuses/${id}/history`);
-    }
-    /**
-     * Obtain the source properties for a status so that it can be edited.
-     * @param id The local ID of the Status in the database
-     * @returns StatusSource
-     * @see https://docs.joinmastodon.org/methods/statuses/#source
-     */
-    fetchSource(id) {
-        return this.http.get(`/api/v1/statuses/${id}/source`);
-    }
-}
-__decorate([
-    version({ since: '0.0.0' })
-], StatusRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StatusRepository.prototype, "create", null);
-__decorate([
-    version({ since: '3.5.0' })
-], StatusRepository.prototype, "update", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StatusRepository.prototype, "remove", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StatusRepository.prototype, "fetchContext", null);
-__decorate([
-    deprecated('Use `card` attribute of status instead'),
-    version({ since: '0.0.0', until: '2.9.3' })
-], StatusRepository.prototype, "fetchCard", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StatusRepository.prototype, "favourite", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StatusRepository.prototype, "unfavourite", null);
-__decorate([
-    version({ since: '1.4.2' })
-], StatusRepository.prototype, "mute", null);
-__decorate([
-    version({ since: '1.4.2' })
-], StatusRepository.prototype, "unmute", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StatusRepository.prototype, "listRebloggedBy", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StatusRepository.prototype, "listFavouritedBy", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StatusRepository.prototype, "reblog", null);
-__decorate([
-    version({ since: '0.0.0' })
-], StatusRepository.prototype, "unreblog", null);
-__decorate([
-    version({ since: '1.6.0' })
-], StatusRepository.prototype, "pin", null);
-__decorate([
-    version({ since: '1.6.0' })
-], StatusRepository.prototype, "unpin", null);
-__decorate([
-    version({ since: '3.1.0' })
-], StatusRepository.prototype, "bookmark", null);
-__decorate([
-    version({ since: '3.1.0' })
-], StatusRepository.prototype, "unbookmark", null);
-__decorate([
-    version({ since: '3.5.0' })
-], StatusRepository.prototype, "listHistory", null);
-__decorate([
-    version({ since: '3.5.0' })
-], StatusRepository.prototype, "fetchSource", null);
+      } else if (responseType === 'stream') {
+        convertedData = stream__default["default"].Readable.from(convertedData);
+      }
 
-let SuggestionRepository$1 = class SuggestionRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
+      return settle(resolve, reject, {
+        data: convertedData,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config
+      });
     }
-    /**
-     * Accounts the user has had past positive interactions with, but is not yet following.
-     * @param params
-     * @returns
-     * @see https://docs.joinmastodon.org/methods/suggestions/#v1
-     */
-    list(params) {
-        return new Paginator(this.http, '/api/v1/suggestions', params);
-    }
-    /**
-     * Remove an account from follow suggestions.
-     * @param id id of the account in the database to be removed from suggestions
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/accounts/suggestions/
-     */
-    remove(id) {
-        return this.http.delete(`/api/v1/suggestions/${id}`);
-    }
-};
-__decorate([
-    deprecated('Use MastoClient.v2.suggestions.list instead'),
-    version({ since: '2.4.3' })
-], SuggestionRepository$1.prototype, "list", null);
-__decorate([
-    version({ since: '2.4.3' })
-], SuggestionRepository$1.prototype, "remove", null);
 
-class TimelineRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
+    if (supportedProtocols.indexOf(protocol) === -1) {
+      return reject(new AxiosError(
+        'Unsupported protocol ' + protocol,
+        AxiosError.ERR_BAD_REQUEST,
+        config
+      ));
     }
-    /**
-     * View statuses from followed users.
-     * @param params Parameters
-     * @return Array of Status
-     * @see https://docs.joinmastodon.org/methods/timelines/
-     */
-    listHome(params) {
-        return new Paginator(this.http, '/api/v1/timelines/home', params);
-    }
-    /**
-     * Public timeline
-     * @param params Parameters
-     * @return Array of Status
-     * @see https://docs.joinmastodon.org/methods/timelines/
-     */
-    listPublic(params) {
-        return new Paginator(this.http, '/api/v1/timelines/public', params);
-    }
-    /**
-     * View public statuses containing the given hashtag.
-     * @param hashtag Content of a #hashtag, not including # symbol.
-     * @param params Parameters
-     * @return Array of Status
-     * @see https://docs.joinmastodon.org/methods/timelines/
-     */
-    listHashtag(hashtag, params) {
-        return new Paginator(this.http, `/api/v1/timelines/tag/${hashtag}`, params);
-    }
-    /**
-     * View statuses in the given list timeline.
-     * @param id Local ID of the list in the database.
-     * @param params Query parameter
-     * @return Array of Status
-     * @see https://docs.joinmastodon.org/methods/timelines/
-     */
-    listList(id, params) {
-        return new Paginator(this.http, `/api/v1/timelines/list/${id}`, params);
-    }
-    /**
-     * View statuses with a “direct” privacy, from your account or in your notifications.
-     * @deprecated Use conversations API instead
-     * @return Array of Status
-     * @see https://docs.joinmastodon.org/methods/timelines/
-     */
-    listDirect(params) {
-        return new Paginator(this.http, '/api/v1/timelines/direct', params);
-    }
-}
-__decorate([
-    version({ since: '0.0.0' })
-], TimelineRepository.prototype, "listHome", null);
-__decorate([
-    version({ since: '0.0.0' })
-], TimelineRepository.prototype, "listPublic", null);
-__decorate([
-    version({ since: '0.0.0' })
-], TimelineRepository.prototype, "listHashtag", null);
-__decorate([
-    version({ since: '2.1.0' })
-], TimelineRepository.prototype, "listList", null);
-__decorate([
-    deprecated('Use conversations API instead'),
-    version({ since: '0.0.0', until: '2.9.3' })
-], TimelineRepository.prototype, "listDirect", null);
 
-let TrendRepository$1 = class TrendRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * View trending statuses
-     * @returns Array of Status
-     * @see https://docs.joinmastodon.org/methods/trends/#statuses
-     */
-    listStatuses(params) {
-        return new Paginator(this.http, '/api/v1/trends/statuses', params);
-    }
-    /**
-     * Links that have been shared more than others.
-     * @see https://docs.joinmastodon.org/methods/trends/#links
-     */
-    listLinks(params) {
-        return new Paginator(this.http, '/api/v1/trends/links', params);
-    }
-    /**
-     * Tags that are being used more frequently within the past week.
-     * @param params Parameters
-     * @return Array of Tag with History
-     * @see https://docs.joinmastodon.org/methods/trends/#tags
-     */
-    listTags(params) {
-        return new Paginator(this.http, '/api/v1/trends/tags', params);
-    }
-};
-__decorate([
-    version({ since: '3.5.0' })
-], TrendRepository$1.prototype, "listStatuses", null);
-__decorate([
-    version({ since: '3.5.0' })
-], TrendRepository$1.prototype, "listLinks", null);
-__decorate([
-    version({ since: '3.0.0' })
-], TrendRepository$1.prototype, "listTags", null);
+    const headers = AxiosHeaders.from(config.headers).normalize();
 
-class EmailRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    createConfirmation(params) {
-        return this.http.post('/api/v1/email/confirmations', params);
-    }
-}
+    // Set User-Agent (required by some servers)
+    // See https://github.com/axios/axios/issues/69
+    // User-Agent is specified; handle case where no UA header is desired
+    // Only set header if it hasn't been set in config
+    headers.set('User-Agent', 'axios/' + VERSION, false);
 
-class TagRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Show a hashtag and its associated information
-     * @param id The name of the hashtag
-     * @return Tag
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/tags/${id}`);
-    }
-    /**
-     * Follow a hashtag. Posts containing a followed hashtag will be inserted into your home timeline.
-     * @param id The name of the hashtag
-     * @return Tag
-     */
-    follow(id) {
-        return this.http.post(`/api/v1/tags/${id}/follow`);
-    }
-    /**
-     * Unfollow a hashtag. Posts containing a followed hashtag will no longer be inserted into your home timeline.
-     * @param id The name of the hashtag
-     * @return Tag
-     */
-    unfollow(id) {
-        return this.http.post(`/api/v1/tags/${id}/unfollow`);
-    }
-}
-__decorate([
-    version({ since: '4.0.0' })
-], TagRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '4.0.0' })
-], TagRepository.prototype, "follow", null);
-__decorate([
-    version({ since: '4.0.0' })
-], TagRepository.prototype, "unfollow", null);
+    const onDownloadProgress = config.onDownloadProgress;
+    const onUploadProgress = config.onUploadProgress;
+    const maxRate = config.maxRate;
+    let maxUploadRate = undefined;
+    let maxDownloadRate = undefined;
 
-class FollowedTagRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    list(params) {
-        return new Paginator(this.http, '/api/v1/followed_tags', params);
-    }
-}
-__decorate([
-    version({ since: '4.0.0' })
-], FollowedTagRepository.prototype, "list", null);
+    // support for https://www.npmjs.com/package/form-data api
+    if (utils.isFormData(data) && utils.isFunction(data.getHeaders)) {
+      headers.set(data.getHeaders());
+    } else if (data && !utils.isStream(data)) {
+      if (Buffer.isBuffer(data)) ; else if (utils.isArrayBuffer(data)) {
+        data = Buffer.from(new Uint8Array(data));
+      } else if (utils.isString(data)) {
+        data = Buffer.from(data, 'utf-8');
+      } else {
+        return reject(new AxiosError(
+          'Data after transformation must be a string, an ArrayBuffer, a Buffer, or a Stream',
+          AxiosError.ERR_BAD_REQUEST,
+          config
+        ));
+      }
 
-class AccountRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * View accounts matching certain criteria for filtering, up to 100 at a time.
-     * Pagination may be done with the HTTP Link header in the response.
-     * @param params Parameters
-     * @return Array of AdminAccount
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    list(params) {
-        return new Paginator(this.http, '/api/v1/admin/accounts', params);
-    }
-    /**
-     * View admin-level information about the given account.
-     * @param id ID of the account
-     * @return AdminAccount
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/admin/accounts/${id}`);
-    }
-    /**
-     * Perform an action against an account and log this action in the moderation history.
-     * @param id g ID of the account
-     * @param params Params
-     * @return Account
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    createAction(id, params) {
-        return this.http.post(`/api/v1/admin/accounts/${id}/action`, params);
-    }
-    /**
-     * Approve the given local account if it is currently pending approval.
-     * @param id ID of the account
-     * @return AdminAccount
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    approve(id) {
-        return this.http.post(`/api/v1/admin/accounts/${id}/approve`);
-    }
-    /**
-     * Reject the given local account if it is currently pending approval.
-     * @param id ID of the account
-     * @return AdminAccount
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    reject(id) {
-        return this.http.post(`/api/v1/admin/accounts/${id}/reject`);
-    }
-    /**
-     * Re-enable a local account whose login is currently disabled.
-     * @param id ID of the account
-     * @return AdminAccount
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    enable(id) {
-        return this.http.post(`/api/v1/admin/accounts/${id}/enable`);
-    }
-    /**
-     * Unsilence a currently silenced account.
-     * @param id ID of the account
-     * @return AdminAccount
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    unsilence(id) {
-        return this.http.post(`/api/v1/admin/accounts/${id}/unsilence`);
-    }
-    /**
-     * Unsuspend a currently suspended account.
-     * @param id ID of the account
-     * @return AdminAccount
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    unsuspend(id) {
-        return this.http.post(`/api/v1/admin/accounts/${id}/unsuspend`);
-    }
-}
-__decorate([
-    version({ since: '2.9.1' })
-], AccountRepository.prototype, "list", null);
-__decorate([
-    version({ since: '2.9.1' })
-], AccountRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '2.9.1' })
-], AccountRepository.prototype, "createAction", null);
-__decorate([
-    version({ since: '2.9.1' })
-], AccountRepository.prototype, "approve", null);
-__decorate([
-    version({ since: '2.9.1' })
-], AccountRepository.prototype, "reject", null);
-__decorate([
-    version({ since: '2.9.1' })
-], AccountRepository.prototype, "enable", null);
-__decorate([
-    version({ since: '2.9.1' })
-], AccountRepository.prototype, "unsilence", null);
-__decorate([
-    version({ since: '2.9.1' })
-], AccountRepository.prototype, "unsuspend", null);
+      // Add Content-Length header if data exists
+      headers.set('Content-Length', data.length, false);
 
-class CanonicalEmailBlockRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
+      if (config.maxBodyLength > -1 && data.length > config.maxBodyLength) {
+        return reject(new AxiosError(
+          'Request body larger than maxBodyLength limit',
+          AxiosError.ERR_BAD_REQUEST,
+          config
+        ));
+      }
     }
-    /**
-     * List all canonical email blocks.
-     * @param params Parameters
-     * @return Array of CanonicalEmailBlock
-     * @see https://docs.joinmastodon.org/methods/admin/canonical_email_blocks/
-     */
-    list(params) {
-        return new Paginator(this.http, '/api/v1/admin/canonical_email_blocks', params);
-    }
-    /**
-     * Show a single canonical email block
-     * @param id id of the canonical email
-     * @return CanonicalEmailBlock
-     * @see https://docs.joinmastodon.org/methods/admin/canonical_email_blocks
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/admin/canonical_email_blocks/${id}`);
-    }
-    /**
-     * Canonicalize and hash an email address.
-     * @param params Parameters
-     * @return Array of CanonicalEmailBlock
-     * @see https://docs.joinmastodon.org/methods/admin/canonical_email_blocks
-     */
-    test(params) {
-        return this.http.post('/api/v1/admin/canonical_email_blocks/test', params);
-    }
-    /**
-     * Block a canonical email.
-     * @param params Parameters
-     * @return CanonicalEmailBlock
-     * @see https://docs.joinmastodon.org/methods/admin/canonical_email_blocks
-     */
-    create(params) {
-        return this.http.post('/api/v1/admin/canonical_email_blocks', params);
-    }
-    /**
-     * Lift a block a canonical email.
-     * @param id id of canonical email
-     * @return null
-     * @see https://docs.joinmastodon.org/methods/admin/canonical_email_blocks
-     */
-    remove(id) {
-        return this.http.delete(`/api/v1/admin/canonical_email_blocks/${id}`);
-    }
-}
-__decorate([
-    version({ since: '4.0.0' })
-], CanonicalEmailBlockRepository.prototype, "list", null);
-__decorate([
-    version({ since: '4.0.0' })
-], CanonicalEmailBlockRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '4.0.0' })
-], CanonicalEmailBlockRepository.prototype, "test", null);
-__decorate([
-    version({ since: '4.0.0' })
-], CanonicalEmailBlockRepository.prototype, "create", null);
-__decorate([
-    version({ since: '4.0.0' })
-], CanonicalEmailBlockRepository.prototype, "remove", null);
 
-class DimensionRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
+    const contentLength = +headers.getContentLength();
+
+    if (utils.isArray(maxRate)) {
+      maxUploadRate = maxRate[0];
+      maxDownloadRate = maxRate[1];
+    } else {
+      maxUploadRate = maxDownloadRate = maxRate;
     }
-    /**
-     * Obtain information about popularity of certain accounts, servers, languages, etc.
-     * @see https://docs.joinmastodon.org/methods/admin/dimensions/#get
-     */
-    fetch(params) {
-        return this.http.post('/api/v1/admin/dimensions', params, {
-            headers: { 'Content-Type': 'multipart/form-data' },
+
+    if (data && (onUploadProgress || maxUploadRate)) {
+      if (!utils.isStream(data)) {
+        data = stream__default["default"].Readable.from(data, {objectMode: false});
+      }
+
+      data = stream__default["default"].pipeline([data, new AxiosTransformStream({
+        length: utils.toFiniteNumber(contentLength),
+        maxRate: utils.toFiniteNumber(maxUploadRate)
+      })], utils.noop);
+
+      onUploadProgress && data.on('progress', progress => {
+        onUploadProgress(Object.assign(progress, {
+          upload: true
+        }));
+      });
+    }
+
+    // HTTP basic authentication
+    let auth = undefined;
+    if (config.auth) {
+      const username = config.auth.username || '';
+      const password = config.auth.password || '';
+      auth = username + ':' + password;
+    }
+
+    if (!auth && parsed.username) {
+      const urlUsername = parsed.username;
+      const urlPassword = parsed.password;
+      auth = urlUsername + ':' + urlPassword;
+    }
+
+    auth && headers.delete('authorization');
+
+    let path;
+
+    try {
+      path = buildURL(
+        parsed.pathname + parsed.search,
+        config.params,
+        config.paramsSerializer
+      ).replace(/^\?/, '');
+    } catch (err) {
+      const customErr = new Error(err.message);
+      customErr.config = config;
+      customErr.url = config.url;
+      customErr.exists = true;
+      return reject(customErr);
+    }
+
+    headers.set('Accept-Encoding', 'gzip, deflate, br', false);
+
+    const options = {
+      path,
+      method: method,
+      headers: headers.toJSON(),
+      agents: { http: config.httpAgent, https: config.httpsAgent },
+      auth,
+      protocol,
+      beforeRedirect: dispatchBeforeRedirect,
+      beforeRedirects: {}
+    };
+
+    if (config.socketPath) {
+      options.socketPath = config.socketPath;
+    } else {
+      options.hostname = parsed.hostname;
+      options.port = parsed.port;
+      setProxy(options, config.proxy, protocol + '//' + parsed.hostname + (parsed.port ? ':' + parsed.port : '') + options.path);
+    }
+
+    let transport;
+    const isHttpsRequest = isHttps.test(options.protocol);
+    options.agent = isHttpsRequest ? config.httpsAgent : config.httpAgent;
+    if (config.transport) {
+      transport = config.transport;
+    } else if (config.maxRedirects === 0) {
+      transport = isHttpsRequest ? https__default["default"] : http__default["default"];
+    } else {
+      if (config.maxRedirects) {
+        options.maxRedirects = config.maxRedirects;
+      }
+      if (config.beforeRedirect) {
+        options.beforeRedirects.config = config.beforeRedirect;
+      }
+      transport = isHttpsRequest ? httpsFollow : httpFollow;
+    }
+
+    if (config.maxBodyLength > -1) {
+      options.maxBodyLength = config.maxBodyLength;
+    } else {
+      // follow-redirects does not skip comparison, so it should always succeed for axios -1 unlimited
+      options.maxBodyLength = Infinity;
+    }
+
+    if (config.insecureHTTPParser) {
+      options.insecureHTTPParser = config.insecureHTTPParser;
+    }
+
+    // Create the request
+    req = transport.request(options, function handleResponse(res) {
+      if (req.destroyed) return;
+
+      const streams = [res];
+
+      // uncompress the response body transparently if required
+      let responseStream = res;
+
+      // return the last request in case of redirects
+      const lastRequest = res.req || req;
+
+      // if decompress disabled we should not decompress
+      if (config.decompress !== false) {
+        // if no content, but headers still say that it is encoded,
+        // remove the header not confuse downstream operations
+        if (data && data.length === 0 && res.headers['content-encoding']) {
+          delete res.headers['content-encoding'];
+        }
+
+        switch (res.headers['content-encoding']) {
+        /*eslint default-case:0*/
+        case 'gzip':
+        case 'compress':
+        case 'deflate':
+          // add the unzipper to the body stream processing pipeline
+          streams.push(zlib__default["default"].createUnzip());
+
+          // remove the content-encoding in order to not confuse downstream operations
+          delete res.headers['content-encoding'];
+          break;
+        case 'br':
+          if (isBrotliSupported) {
+            streams.push(zlib__default["default"].createBrotliDecompress());
+            delete res.headers['content-encoding'];
+          }
+        }
+      }
+
+      if (onDownloadProgress) {
+        const responseLength = +res.headers['content-length'];
+
+        const transformStream = new AxiosTransformStream({
+          length: utils.toFiniteNumber(responseLength),
+          maxRate: utils.toFiniteNumber(maxDownloadRate)
         });
-    }
-}
 
-class DomainAllowRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Show information about all allowed domains
-     * @param params Parameters
-     * @return Array of DomainAllow
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    list(params) {
-        return new Paginator(this.http, '/api/v1/admin/domain_allows', params);
-    }
-    /**
-     * Show information about a single allowed domain
-     * @param id id of the domain
-     * @return DomainAllow
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/admin/domain_allows/${id}`);
-    }
-    /**
-     * Add a domain to the list of domains allowed to federate,
-     * to be used when the instance is in allow-list federation mode.
-     * @param params parameters
-     * @return DomainAllow
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    create(params) {
-        return this.http.post('/api/v1/admin/domain_allows', params);
-    }
-    /**
-     * Delete a domain from the allowed domains list.
-     * @param id id of domain
-     * @return DomainAllow
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    remove(id) {
-        return this.http.delete(`/api/v1/admin/domain_allows/${id}`);
-    }
-}
-__decorate([
-    version({ since: '4.0.0' })
-], DomainAllowRepository.prototype, "list", null);
-__decorate([
-    version({ since: '4.0.0' })
-], DomainAllowRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '4.0.0' })
-], DomainAllowRepository.prototype, "create", null);
-__decorate([
-    version({ since: '4.0.0' })
-], DomainAllowRepository.prototype, "remove", null);
-
-class DomainBlockRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     *
-     * @param params Parameters
-     * @return Array of DomainBlocks
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    list(params) {
-        return new Paginator(this.http, '/api/v1/admin/domain_blocks', params);
-    }
-    /**
-     * Show information about a single blocked domain.
-     * @param id ID of the account
-     * @return DomainBlocks
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/admin/domain_blocks/${id}`);
-    }
-    /**
-     * Add a domain to the list of domains blocked from federating.
-     * @param params Parameters
-     * @return DomainBlocks
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    create(params) {
-        return this.http.post('/api/v1/admin/domain_blocks', params);
-    }
-    /**
-     * Change parameters for an existing domain block.
-     * @param id id of domain
-     * @param params Parameters
-     * @return DomainBlocks
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    update(id, params) {
-        return this.http.put(`/api/v1/admin/domain_blocks/${id}`, params);
-    }
-    /**
-     * Lift a block against a domain.
-     * @param id id of domain
-     * @return DomainBlocks
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    remove(id) {
-        return this.http.delete(`/api/v1/admin/domain_blocks/${id}`);
-    }
-}
-__decorate([
-    version({ since: '4.0.0' })
-], DomainBlockRepository.prototype, "list", null);
-__decorate([
-    version({ since: '4.0.0' })
-], DomainBlockRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '4.0.0' })
-], DomainBlockRepository.prototype, "create", null);
-__decorate([
-    version({ since: '4.0.0' })
-], DomainBlockRepository.prototype, "update", null);
-__decorate([
-    version({ since: '4.0.0' })
-], DomainBlockRepository.prototype, "remove", null);
-
-class EmailDomainBlockRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Show information about all email domains blocked from signing up.
-     * @param params Parameters
-     * @return Array of EmailDomainBlock
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    list(params) {
-        return new Paginator(this.http, '/api/v1/admin/email_domain_blocks ', params);
-    }
-    /**
-     * Show information about a single email domain that is blocked from sign-ups.
-     * @param id id of the DomainBlock
-     * @return Array of EmailDomainBlock
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/admin/email_domain_blocks/${id}`);
-    }
-    /**
-     * Add a domain to the list of email domains blocked from sign-ups.
-     * @param params Parameters
-     * @return Array of EmailDomainBlock
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    create(params) {
-        return this.http.post('/api/v1/admin/email_domain_blocks ', params);
-    }
-    /**
-     * Lift a block against an email domain.
-     * @param id id of domain
-     * @return null
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    remove(id) {
-        return this.http.delete(`/api/v1/admin/email_domain_blocks/${id}`);
-    }
-}
-__decorate([
-    version({ since: '4.0.0' })
-], EmailDomainBlockRepository.prototype, "list", null);
-__decorate([
-    version({ since: '4.0.0' })
-], EmailDomainBlockRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '4.0.0' })
-], EmailDomainBlockRepository.prototype, "create", null);
-__decorate([
-    version({ since: '4.0.0' })
-], EmailDomainBlockRepository.prototype, "remove", null);
-
-class IpBlockRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Show information about all blocked IP ranges.
-     * @param params Parameters
-     * @return Array of Ip Block
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    list(params) {
-        return new Paginator(this.http, '/api/v1/admin/ip_blocks', params);
-    }
-    /**
-     * Show information about all blocked IP ranges.
-     * @param id id of the Ip blocked
-     * @return object of Ip Block
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/admin/ip_blocks/${id}`);
-    }
-    /**
-     * Add an IP address range to the list of IP blocks.
-     * @param params Parameters
-     * @return object of Ip Block
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    create(params) {
-        return this.http.post('/api/v1/admin/ip_blocks', params);
-    }
-    /**
-     * Change parameters for an existing IP block.
-     * @param params Parameters
-     * @return object of Ip Block
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    update(params) {
-        return this.http.put('/api/v1/admin/ip_blocks', params);
-    }
-    /**
-     * Lift a block against an IP range.
-     * @param id id of ip block
-     * @return null
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    remove(id) {
-        return this.http.delete(`/api/v1/admin/ip_blocks/${id}`);
-    }
-}
-__decorate([
-    version({ since: '4.0.0' })
-], IpBlockRepository.prototype, "list", null);
-__decorate([
-    version({ since: '4.0.0' })
-], IpBlockRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '4.0.0' })
-], IpBlockRepository.prototype, "create", null);
-__decorate([
-    version({ since: '4.0.0' })
-], IpBlockRepository.prototype, "update", null);
-__decorate([
-    version({ since: '4.0.0' })
-], IpBlockRepository.prototype, "remove", null);
-
-class MeasureRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Obtain quantitative metrics about the server.
-     * @see https://docs.joinmastodon.org/methods/admin/measures/#get
-     */
-    fetch(params) {
-        return this.http.post('/api/v1/admin/measures', params, {
-            headers: { 'Content-Type': 'multipart/form-data' },
+        onDownloadProgress && transformStream.on('progress', progress => {
+          onDownloadProgress(Object.assign(progress, {
+            download: true
+          }));
         });
-    }
-}
-__decorate([
-    version({ since: '3.5.0' })
-], MeasureRepository.prototype, "fetch", null);
 
-class ReportRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * View all reports. Pagination may be done with HTTP Link header in the response.
-     * @param params Parameters
-     * @return Array of AdminReport
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    list(params) {
-        return new Paginator(this.http, '/api/v1/admin/reports', params);
-    }
-    /**
-     * View information about the report with the given ID.
-     * @param id ID of the report
-     * @return AdminReport
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    fetch(id) {
-        return this.http.get(`/api/v1/admin/reports/${id}`);
-    }
-    /**
-     * Claim the handling of this report to yourself.
-     * @param id ID of the report
-     * @return AdminReport
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    assignToSelf(id) {
-        return this.http.post(`/api/v1/admin/reports/${id}/assign_to_self`);
-    }
-    /**
-     * Unassign a report so that someone else can claim it.
-     * @param id ID of the report
-     * @return AdminReport
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    unassign(id) {
-        return this.http.post(`/api/v1/admin/reports/${id}/unassign`);
-    }
-    /**
-     * Mark a report as resolved with no further action taken.
-     * @param id ID of the report
-     * @return AdminReport
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    resolve(id) {
-        return this.http.post(`/api/v1/admin/reports/${id}/resolve`);
-    }
-    /**
-     * Reopen a currently closed report.
-     * @param id ID of the report
-     * @return AdminReport
-     * @see https://docs.joinmastodon.org/methods/admin/
-     */
-    reopen(id) {
-        return this.http.post(`/api/v1/admin/reports/${id}/reopen`);
-    }
-}
-__decorate([
-    version({ since: '2.9.1' })
-], ReportRepository.prototype, "list", null);
-__decorate([
-    version({ since: '2.9.1' })
-], ReportRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '2.9.1' })
-], ReportRepository.prototype, "assignToSelf", null);
-__decorate([
-    version({ since: '2.9.1' })
-], ReportRepository.prototype, "unassign", null);
-__decorate([
-    version({ since: '2.9.1' })
-], ReportRepository.prototype, "resolve", null);
-__decorate([
-    version({ since: '2.9.1' })
-], ReportRepository.prototype, "reopen", null);
+        streams.push(transformStream);
+      }
 
-class RetentionRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Generate a retention data report for a given time period and bucket.
-     * @see https://docs.joinmastodon.org/methods/admin/retention/#create
-     */
-    create(params) {
-        return this.http.get('/api/v1/admin/retention', params, {
-            headers: { 'Content-Type': 'multipart/form-data' },
+      responseStream = streams.length > 1 ? stream__default["default"].pipeline(streams, utils.noop) : streams[0];
+
+      const offListeners = stream__default["default"].finished(responseStream, () => {
+        offListeners();
+        onFinished();
+      });
+
+      const response = {
+        status: res.statusCode,
+        statusText: res.statusMessage,
+        headers: new AxiosHeaders(res.headers),
+        config,
+        request: lastRequest
+      };
+
+      if (responseType === 'stream') {
+        response.data = responseStream;
+        settle(resolve, reject, response);
+      } else {
+        const responseBuffer = [];
+        let totalResponseBytes = 0;
+
+        responseStream.on('data', function handleStreamData(chunk) {
+          responseBuffer.push(chunk);
+          totalResponseBytes += chunk.length;
+
+          // make sure the content length is not over the maxContentLength if specified
+          if (config.maxContentLength > -1 && totalResponseBytes > config.maxContentLength) {
+            // stream.destroy() emit aborted event before calling reject() on Node.js v16
+            rejected = true;
+            responseStream.destroy();
+            reject(new AxiosError('maxContentLength size of ' + config.maxContentLength + ' exceeded',
+              AxiosError.ERR_BAD_RESPONSE, config, lastRequest));
+          }
         });
-    }
-}
 
-class TrendRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Links that have been shared more than others, including unapproved and unreviewed links.
-     * @see https://docs.joinmastodon.org/methods/admin/trends/#links
-     */
-    listLinks() {
-        return new Paginator(this.http, '/api/v1/admin/trends/links');
-    }
-    /**
-     * Statuses that have been interacted with more than others, including unapproved and unreviewed statuses.
-     * @see https://docs.joinmastodon.org/methods/admin/trends/#statuses
-     */
-    listStatuses() {
-        return new Paginator(this.http, '/api/v1/admin/trends/statuses');
-    }
-    /**
-     * Tags that are being used more frequently within the past week, including unapproved and unreviewed tags.
-     * @see https://docs.joinmastodon.org/methods/admin/trends/#tags
-     */
-    listTags() {
-        return new Paginator(this.http, '/api/v1/admin/trends/statuses');
-    }
-}
-__decorate([
-    version({ since: '3.5.0' })
-], TrendRepository.prototype, "listLinks", null);
-__decorate([
-    version({ since: '3.5.0' })
-], TrendRepository.prototype, "listStatuses", null);
-__decorate([
-    version({ since: '3.5.0' })
-], TrendRepository.prototype, "listTags", null);
+        responseStream.on('aborted', function handlerStreamAborted() {
+          if (rejected) {
+            return;
+          }
 
-var index$3 = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  AccountRepository: AccountRepository,
-  CanonicalEmailBlockRepository: CanonicalEmailBlockRepository,
-  DimensionRepository: DimensionRepository,
-  DomainAllowRepository: DomainAllowRepository,
-  DomainBlockRepository: DomainBlockRepository,
-  EmailDomainBlockRepository: EmailDomainBlockRepository,
-  IpBlockRepository: IpBlockRepository,
-  MeasureRepository: MeasureRepository,
-  ReportRepository: ReportRepository,
-  RetentionRepository: RetentionRepository,
-  TrendRepository: TrendRepository
-});
+          const err = new AxiosError(
+            'maxContentLength size of ' + config.maxContentLength + ' exceeded',
+            AxiosError.ERR_BAD_RESPONSE,
+            config,
+            lastRequest
+          );
+          responseStream.destroy(err);
+          reject(err);
+        });
 
-class AggregateRepositoryAdmin {
-    /** @deprecated Use `accounts` instead */
-    get account() {
-        return this.accounts;
-    }
-    /** @deprecated Use `reports` instead */
-    get report() {
-        return this.reports;
-    }
-    /** @deprecated Use `emailDomainBlocks` instead */
-    get domainEmailBlocks() {
-        return this.emailDomainBlocks;
-    }
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-        this.accounts = new AccountRepository(this.http, this.config, this.logger);
-        this.canonicalEmailBlocks =
-            new CanonicalEmailBlockRepository(this.http, this.config, this.logger);
-        this.dimensions = new DimensionRepository(this.http, this.config, this.logger);
-        this.domainBlocks = new DomainBlockRepository(this.http, this.config, this.logger);
-        this.domainAllows = new DomainAllowRepository(this.http, this.config, this.logger);
-        this.emailDomainBlocks = new EmailDomainBlockRepository(this.http, this.config, this.logger);
-        this.ipBlocks = new IpBlockRepository(this.http, this.config, this.logger);
-        this.measures = new MeasureRepository(this.http, this.config, this.logger);
-        this.reports = new ReportRepository(this.http, this.config, this.logger);
-        this.retention = new RetentionRepository(this.http, this.config, this.logger);
-        this.trends = new TrendRepository(this.http, this.config, this.logger);
-    }
-}
+        responseStream.on('error', function handleStreamError(err) {
+          if (req.destroyed) return;
+          reject(AxiosError.from(err, null, config, lastRequest));
+        });
 
-let AggregateRepository$1 = class AggregateRepository {
-    constructor(http, ws, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-        this.admin = new AggregateRepositoryAdmin(http, config, logger);
-        this.stream = new StreamRepository(ws, config, logger);
-        this.accounts = new AccountRepository$1(http, config, logger);
-        this.announcements = new AnnouncementRepository(http, config, logger);
-        this.apps = new AppRepository(http, config, logger);
-        this.blocks = new BlockRepository(http, config, logger);
-        this.bookmarks = new BookmarkRepository(http, config, logger);
-        this.conversations = new ConversationRepository(http, config, logger);
-        this.customEmojis = new CustomEmojiRepository(http, config, logger);
-        this.directory = new DirectoryRepository(http, config, logger);
-        this.domainBlocks = new DomainBlockRepository$1(http, config, logger);
-        this.endorsements = new EndorsementRepository(http, config, logger);
-        this.favourites = new FavouriteRepository(http, config, logger);
-        this.featuredTags = new FeaturedTagRepository(http, config, logger);
-        this.filters = new FilterRepository$1(http, config, logger);
-        this.followRequests = new FollowRequestRepository(http, config, logger);
-        this.instances = new InstanceRepository$1(http, config, logger);
-        this.lists = new ListRepository(http, config, logger);
-        this.markers = new MarkerRepository(http, config, logger);
-        this.mediaAttachments = new MediaAttachmentRepository$1(http, config, logger);
-        this.mutes = new MuteRepository(http, config, logger);
-        this.notifications = new NotificationRepository(http, config, logger);
-        this.polls = new PollRepository(http, config, logger);
-        this.preferences = new PreferenceRepository(http, config, logger);
-        this.webPushSubscriptions = new WebPushSubscriptionRepository(http, config, logger);
-        this.reports = new ReportRepository$1(http, config, logger);
-        this.scheduledStatuses = new ScheduledStatusRepository(http, config, logger);
-        this.statuses = new StatusRepository(http, config, logger);
-        this.suggestions = new SuggestionRepository$1(http, config, logger);
-        this.timelines = new TimelineRepository(http, config, logger);
-        this.trends = new TrendRepository$1(http, config, logger);
-        this.email = new EmailRepository(http, config, logger);
-        this.tags = new TagRepository(http, config, logger);
-        this.followedTags = new FollowedTagRepository(http, config, logger);
-    }
-    /**
-     * Search, but hashtags is an array of strings instead of an array of Tag.
-     * @param params Parameters
-     * @return Results
-     * @see https://docs.joinmastodon.org/methods/search/
-     */
-    search(params) {
-        return new Paginator(this.http, `/api/v1/search`, params);
-    }
-};
-__decorate([
-    version({ since: '1.1.0', until: '3.0.0' })
-], AggregateRepository$1.prototype, "search", null);
-
-var index$2 = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  Admin: index$4,
-  AccountRepository: AccountRepository$1,
-  StreamRepository: StreamRepository,
-  AnnouncementRepository: AnnouncementRepository,
-  AppRepository: AppRepository,
-  BlockRepository: BlockRepository,
-  BookmarkRepository: BookmarkRepository,
-  ConversationRepository: ConversationRepository,
-  CustomEmojiRepository: CustomEmojiRepository,
-  DirectoryRepository: DirectoryRepository,
-  DomainBlockRepository: DomainBlockRepository$1,
-  EndorsementRepository: EndorsementRepository,
-  FavouriteRepository: FavouriteRepository,
-  FeaturedTagRepository: FeaturedTagRepository,
-  FilterRepository: FilterRepository$1,
-  FollowRequestRepository: FollowRequestRepository,
-  InstanceRepository: InstanceRepository$1,
-  ListRepository: ListRepository,
-  MarkerRepository: MarkerRepository,
-  MediaAttachmentRepository: MediaAttachmentRepository$1,
-  MuteRepository: MuteRepository,
-  NotificationRepository: NotificationRepository,
-  PollRepository: PollRepository,
-  PreferenceRepository: PreferenceRepository,
-  WebPushSubscriptionRepository: WebPushSubscriptionRepository,
-  ReportRepository: ReportRepository$1,
-  ScheduledStatusRepository: ScheduledStatusRepository,
-  StatusRepository: StatusRepository,
-  SuggestionRepository: SuggestionRepository$1,
-  TimelineRepository: TimelineRepository,
-  TrendRepository: TrendRepository$1,
-  EmailRepository: EmailRepository,
-  TagRepository: TagRepository,
-  FollowedTagRepository: FollowedTagRepository,
-  AdminRepositories: index$3,
-  AggregateRepository: AggregateRepository$1,
-  AggregateRepositoryAdmin: AggregateRepositoryAdmin
-});
-
-class FilterRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * View all filters
-     * @return Filter
-     * @see https://docs.joinmastodon.org/methods/accounts/filters/
-     */
-    list() {
-        return new Paginator(this.http, `/api/v2/filters`);
-    }
-    /**
-     * View a single filter
-     * @param id ID of the filter
-     * @return Returns Filter
-     * @see https://docs.joinmastodon.org/methods/accounts/filters/
-     */
-    fetch(id) {
-        return this.http.get(`/api/v2/filters/${id}`);
-    }
-    /**
-     * Create a filter
-     * @param params Parameters
-     * @return Filter
-     * @see https://docs.joinmastodon.org/methods/accounts/filters/
-     */
-    create(params) {
-        return this.http.post(`/api/v2/filters`, params);
-    }
-    /**
-     * Update a filter
-     * @param id ID of the filter in the database
-     * @param params Parameters
-     * @return Filter
-     * @see https://docs.joinmastodon.org/methods/accounts/filters/
-     */
-    update(id, params) {
-        return this.http.put(`/api/v2/filters/${id}`, params);
-    }
-    /**
-     * Remove a filter
-     * @param id ID of the filter in the database
-     * @return N/A
-     * @see https://docs.joinmastodon.org/methods/accounts/filters/
-     */
-    remove(id) {
-        return this.http.delete(`/api/v2/filters/${id}`);
-    }
-}
-__decorate([
-    version({ since: '2.4.3' })
-], FilterRepository.prototype, "list", null);
-__decorate([
-    version({ since: '2.4.3' })
-], FilterRepository.prototype, "fetch", null);
-__decorate([
-    version({ since: '2.4.3' })
-], FilterRepository.prototype, "create", null);
-__decorate([
-    version({ since: '2.4.3' })
-], FilterRepository.prototype, "update", null);
-__decorate([
-    version({ since: '2.4.3' })
-], FilterRepository.prototype, "remove", null);
-
-class InstanceRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-    }
-    /**
-     * Information about the server.
-     * @return Instance
-     * @see https://docs.joinmastodon.org/methods/instance/
-     */
-    fetch() {
-        return this.http.get('/api/v2/instance');
-    }
-}
-__decorate([
-    version({ since: '1.0.0' })
-], InstanceRepository.prototype, "fetch", null);
-
-// Repository<V1.MediaAttachment, CreateMediaAttachmentParams>;
-class MediaAttachmentRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-        this.v1 = new MediaAttachmentRepository$1(http, config);
-    }
-    /**
-     * @experimental
-     * @param id ID of the media
-     * @param interval interval of polling
-     * @returns Media attachment that has done processing
-     */
-    waitFor(id, interval = 1000) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const timeout = this.config.createTimeout();
-            let media;
-            while (media == undefined) {
-                if (timeout.signal.aborted) {
-                    throw new MastoTimeoutError('The media encoding has been timed out in your instance.');
-                }
-                yield delay(interval);
-                try {
-                    const processing = yield this.v1.fetch(id);
-                    if (processing.url != undefined) {
-                        media = processing;
-                        timeout.clear();
-                    }
-                }
-                catch (error) {
-                    // Some instance caches API response
-                    if (error instanceof MastoHttpNotFoundError) {
-                        continue;
-                    }
-                    throw error;
-                }
+        responseStream.on('end', function handleStreamEnd() {
+          try {
+            let responseData = responseBuffer.length === 1 ? responseBuffer[0] : Buffer.concat(responseBuffer);
+            if (responseType !== 'arraybuffer') {
+              responseData = responseData.toString(responseEncoding);
+              if (!responseEncoding || responseEncoding === 'utf8') {
+                responseData = utils.stripBOM(responseData);
+              }
             }
-            return media;
+            response.data = responseData;
+          } catch (err) {
+            reject(AxiosError.from(err, null, config, response.request, response));
+          }
+          settle(resolve, reject, response);
         });
+      }
+
+      emitter.once('abort', err => {
+        if (!responseStream.destroyed) {
+          responseStream.emit('error', err);
+          responseStream.destroy();
+        }
+      });
+    });
+
+    emitter.once('abort', err => {
+      reject(err);
+      req.destroy(err);
+    });
+
+    // Handle errors
+    req.on('error', function handleRequestError(err) {
+      // @todo remove
+      // if (req.aborted && err.code !== AxiosError.ERR_FR_TOO_MANY_REDIRECTS) return;
+      reject(AxiosError.from(err, null, config, req));
+    });
+
+    // set tcp keep alive to prevent drop connection by peer
+    req.on('socket', function handleRequestSocket(socket) {
+      // default interval of sending ack packet is 1 minute
+      socket.setKeepAlive(true, 1000 * 60);
+    });
+
+    // Handle request timeout
+    if (config.timeout) {
+      // This is forcing a int timeout to avoid problems if the `req` interface doesn't handle other types.
+      const timeout = parseInt(config.timeout, 10);
+
+      if (isNaN(timeout)) {
+        reject(new AxiosError(
+          'error trying to parse `config.timeout` to int',
+          AxiosError.ERR_BAD_OPTION_VALUE,
+          config,
+          req
+        ));
+
+        return;
+      }
+
+      // Sometime, the response will be very slow, and does not respond, the connect event will be block by event loop system.
+      // And timer callback will be fired, and abort() will be invoked before connection, then get "socket hang up" and code ECONNRESET.
+      // At this time, if we have a large number of request, nodejs will hang up some socket on background. and the number will up and up.
+      // And then these socket which be hang up will devouring CPU little by little.
+      // ClientRequest.setTimeout will be fired on the specify milliseconds, and can make sure that abort() will be fired after connect.
+      req.setTimeout(timeout, function handleRequestTimeout() {
+        if (isDone) return;
+        let timeoutErrorMessage = config.timeout ? 'timeout of ' + config.timeout + 'ms exceeded' : 'timeout exceeded';
+        const transitional = config.transitional || transitionalDefaults;
+        if (config.timeoutErrorMessage) {
+          timeoutErrorMessage = config.timeoutErrorMessage;
+        }
+        reject(new AxiosError(
+          timeoutErrorMessage,
+          transitional.clarifyTimeoutError ? AxiosError.ETIMEDOUT : AxiosError.ECONNABORTED,
+          config,
+          req
+        ));
+        abort();
+      });
     }
+
+
+    // Send the request
+    if (utils.isStream(data)) {
+      let ended = false;
+      let errored = false;
+
+      data.on('end', () => {
+        ended = true;
+      });
+
+      data.once('error', err => {
+        errored = true;
+        req.destroy(err);
+      });
+
+      data.on('close', () => {
+        if (!ended && !errored) {
+          abort(new CanceledError('Request stream has been aborted', config, req));
+        }
+      });
+
+      data.pipe(req);
+    } else {
+      req.end(data);
+    }
+  });
+}
+
+const cookies = platform.isStandardBrowserEnv ?
+
+// Standard browser envs support document.cookie
+  (function standardBrowserEnv() {
+    return {
+      write: function write(name, value, expires, path, domain, secure) {
+        const cookie = [];
+        cookie.push(name + '=' + encodeURIComponent(value));
+
+        if (utils.isNumber(expires)) {
+          cookie.push('expires=' + new Date(expires).toGMTString());
+        }
+
+        if (utils.isString(path)) {
+          cookie.push('path=' + path);
+        }
+
+        if (utils.isString(domain)) {
+          cookie.push('domain=' + domain);
+        }
+
+        if (secure === true) {
+          cookie.push('secure');
+        }
+
+        document.cookie = cookie.join('; ');
+      },
+
+      read: function read(name) {
+        const match = document.cookie.match(new RegExp('(^|;\\s*)(' + name + ')=([^;]*)'));
+        return (match ? decodeURIComponent(match[3]) : null);
+      },
+
+      remove: function remove(name) {
+        this.write(name, '', Date.now() - 86400000);
+      }
+    };
+  })() :
+
+// Non standard browser env (web workers, react-native) lack needed support.
+  (function nonStandardBrowserEnv() {
+    return {
+      write: function write() {},
+      read: function read() { return null; },
+      remove: function remove() {}
+    };
+  })();
+
+const isURLSameOrigin = platform.isStandardBrowserEnv ?
+
+// Standard browser envs have full support of the APIs needed to test
+// whether the request URL is of the same origin as current location.
+  (function standardBrowserEnv() {
+    const msie = /(msie|trident)/i.test(navigator.userAgent);
+    const urlParsingNode = document.createElement('a');
+    let originURL;
+
     /**
-     * Creates an attachment to be used with a new status.
-     * @param params Parameters
-     * @return Attachment
-     * @see https://docs.joinmastodon.org/methods/statuses/media/
-     */
-    create(params, extra = {}) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const media = yield this.http.post(`/api/v2/media`, params, { headers: { 'Content-Type': 'multipart/form-data' } });
-            if (extra.skipPolling) {
-                return media;
-            }
-            return this.waitFor(media.id);
-        });
-    }
-}
-__decorate([
-    version({ since: '3.1.3' })
-], MediaAttachmentRepository.prototype, "create", null);
+    * Parse a URL to discover it's components
+    *
+    * @param {String} url The URL to be parsed
+    * @returns {Object}
+    */
+    function resolveURL(url) {
+      let href = url;
 
-class SuggestionRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
+      if (msie) {
+        // IE needs attribute set twice to normalize properties
+        urlParsingNode.setAttribute('href', href);
+        href = urlParsingNode.href;
+      }
+
+      urlParsingNode.setAttribute('href', href);
+
+      // urlParsingNode provides the UrlUtils interface - http://url.spec.whatwg.org/#urlutils
+      return {
+        href: urlParsingNode.href,
+        protocol: urlParsingNode.protocol ? urlParsingNode.protocol.replace(/:$/, '') : '',
+        host: urlParsingNode.host,
+        search: urlParsingNode.search ? urlParsingNode.search.replace(/^\?/, '') : '',
+        hash: urlParsingNode.hash ? urlParsingNode.hash.replace(/^#/, '') : '',
+        hostname: urlParsingNode.hostname,
+        port: urlParsingNode.port,
+        pathname: (urlParsingNode.pathname.charAt(0) === '/') ?
+          urlParsingNode.pathname :
+          '/' + urlParsingNode.pathname
+      };
     }
+
+    originURL = resolveURL(window.location.href);
+
     /**
-     * View follow suggestions.
-     * Accounts that are promoted by staff, or that the user has had past positive interactions with, but is not yet following.
-     * @param params
-     * @returns
-     */
-    list(params) {
-        return new Paginator(this.http, '/api/v2/suggestions', params);
-    }
-}
-__decorate([
-    version({ since: '3.4.0' })
-], SuggestionRepository.prototype, "list", null);
+    * Determine if a URL shares the same origin as the current location
+    *
+    * @param {String} requestURL The URL to test
+    * @returns {boolean} True if URL shares the same origin, otherwise false
+    */
+    return function isURLSameOrigin(requestURL) {
+      const parsed = (utils.isString(requestURL)) ? resolveURL(requestURL) : requestURL;
+      return (parsed.protocol === originURL.protocol &&
+          parsed.host === originURL.host);
+    };
+  })() :
 
-class AggregateRepository {
-    constructor(http, config, logger) {
-        this.http = http;
-        this.config = config;
-        this.logger = logger;
-        this.filters = new FilterRepository(http, config, logger);
-        this.instance = new InstanceRepository(http, config, logger);
-        this.mediaAttachments = new MediaAttachmentRepository(http, config, logger);
-        this.suggestions = new SuggestionRepository(http, config, logger);
-    }
-    /**
-     * Perform a search
-     * @param params Parameters
-     * @return Results
-     * @see https://docs.joinmastodon.org/methods/search/
-     */
-    search(params) {
-        return new Paginator(this.http, `/api/v2/search`, params);
-    }
-}
-__decorate([
-    version({ since: '1.1.0', until: '3.0.0' })
-], AggregateRepository.prototype, "search", null);
+  // Non standard browser envs (web workers, react-native) lack needed support.
+  (function nonStandardBrowserEnv() {
+    return function isURLSameOrigin() {
+      return true;
+    };
+  })();
 
-var index$1 = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  FilterRepository: FilterRepository,
-  InstanceRepository: InstanceRepository,
-  MediaAttachmentRepository: MediaAttachmentRepository,
-  SuggestionRepository: SuggestionRepository,
-  AggregateRepository: AggregateRepository
-});
+function progressEventReducer(listener, isDownloadStream) {
+  let bytesNotified = 0;
+  const _speedometer = speedometer(50, 250);
 
-class Client {
-    constructor(http, ws, config, logger) {
-        this.http = http;
-        this.ws = ws;
-        this.config = config;
-        this.logger = logger;
-        this.v1 = new AggregateRepository$1(http, ws, config, logger);
-        this.v2 = new AggregateRepository(http, config, logger);
-    }
+  return e => {
+    const loaded = e.loaded;
+    const total = e.lengthComputable ? e.total : undefined;
+    const progressBytes = loaded - bytesNotified;
+    const rate = _speedometer(progressBytes);
+    const inRange = loaded <= total;
+
+    bytesNotified = loaded;
+
+    const data = {
+      loaded,
+      total,
+      progress: total ? (loaded / total) : undefined,
+      bytes: progressBytes,
+      rate: rate ? rate : undefined,
+      estimated: rate && total && inRange ? (total - loaded) / rate : undefined
+    };
+
+    data[isDownloadStream ? 'download' : 'upload'] = true;
+
+    listener(data);
+  };
 }
 
-var index = /*#__PURE__*/Object.freeze({
-  __proto__: null,
-  v1: index$2,
-  v2: index$1,
-  Client: Client
-});
+function xhrAdapter(config) {
+  return new Promise(function dispatchXhrRequest(resolve, reject) {
+    let requestData = config.data;
+    const requestHeaders = AxiosHeaders.from(config.headers).normalize();
+    const responseType = config.responseType;
+    let onCanceled;
+    function done() {
+      if (config.cancelToken) {
+        config.cancelToken.unsubscribe(onCanceled);
+      }
 
-const isObject = (x) => typeof x === 'object' && x !== null && x.constructor === Object;
+      if (config.signal) {
+        config.signal.removeEventListener('abort', onCanceled);
+      }
+    }
 
-const flattenObject = (object, parent = '') => {
-    if (Array.isArray(object)) {
-        return object
-            .map((value, i) => flattenObject(value, parent !== '' ? `${parent}[${i}]` : i.toString()))
-            .reduce((prev, curr) => Object.assign(prev, curr), {});
+    if (utils.isFormData(requestData) && platform.isStandardBrowserEnv) {
+      requestHeaders.setContentType(false); // Let the browser set it
     }
-    if (isObject(object)) {
-        return Object.entries(object)
-            .map(([key, value]) => flattenObject(value, parent !== '' ? `${parent}[${key}]` : key))
-            .reduce((prev, curr) => Object.assign(prev, curr), {});
+
+    let request = new XMLHttpRequest();
+
+    // HTTP basic authentication
+    if (config.auth) {
+      const username = config.auth.username || '';
+      const password = config.auth.password ? unescape(encodeURIComponent(config.auth.password)) : '';
+      requestHeaders.set('Authorization', 'Basic ' + btoa(username + ':' + password));
     }
-    // Unit of the monoid is always an object
-    return parent !== ''
-        ? { [parent]: object }
-        : object;
+
+    const fullPath = buildFullPath(config.baseURL, config.url);
+
+    request.open(config.method.toUpperCase(), buildURL(fullPath, config.params, config.paramsSerializer), true);
+
+    // Set the request timeout in MS
+    request.timeout = config.timeout;
+
+    function onloadend() {
+      if (!request) {
+        return;
+      }
+      // Prepare the response
+      const responseHeaders = AxiosHeaders.from(
+        'getAllResponseHeaders' in request && request.getAllResponseHeaders()
+      );
+      const responseData = !responseType || responseType === 'text' ||  responseType === 'json' ?
+        request.responseText : request.response;
+      const response = {
+        data: responseData,
+        status: request.status,
+        statusText: request.statusText,
+        headers: responseHeaders,
+        config,
+        request
+      };
+
+      settle(function _resolve(value) {
+        resolve(value);
+        done();
+      }, function _reject(err) {
+        reject(err);
+        done();
+      }, response);
+
+      // Clean up request
+      request = null;
+    }
+
+    if ('onloadend' in request) {
+      // Use onloadend if available
+      request.onloadend = onloadend;
+    } else {
+      // Listen for ready state to emulate onloadend
+      request.onreadystatechange = function handleLoad() {
+        if (!request || request.readyState !== 4) {
+          return;
+        }
+
+        // The request errored out and we didn't get a response, this will be
+        // handled by onerror instead
+        // With one exception: request that using file: protocol, most browsers
+        // will return status as 0 even though it's a successful request
+        if (request.status === 0 && !(request.responseURL && request.responseURL.indexOf('file:') === 0)) {
+          return;
+        }
+        // readystate handler is calling before onerror or ontimeout handlers,
+        // so we should call onloadend on the next 'tick'
+        setTimeout(onloadend);
+      };
+    }
+
+    // Handle browser request cancellation (as opposed to a manual cancellation)
+    request.onabort = function handleAbort() {
+      if (!request) {
+        return;
+      }
+
+      reject(new AxiosError('Request aborted', AxiosError.ECONNABORTED, config, request));
+
+      // Clean up request
+      request = null;
+    };
+
+    // Handle low level network errors
+    request.onerror = function handleError() {
+      // Real errors are hidden from us by the browser
+      // onerror should only fire if it's a network error
+      reject(new AxiosError('Network Error', AxiosError.ERR_NETWORK, config, request));
+
+      // Clean up request
+      request = null;
+    };
+
+    // Handle timeout
+    request.ontimeout = function handleTimeout() {
+      let timeoutErrorMessage = config.timeout ? 'timeout of ' + config.timeout + 'ms exceeded' : 'timeout exceeded';
+      const transitional = config.transitional || transitionalDefaults;
+      if (config.timeoutErrorMessage) {
+        timeoutErrorMessage = config.timeoutErrorMessage;
+      }
+      reject(new AxiosError(
+        timeoutErrorMessage,
+        transitional.clarifyTimeoutError ? AxiosError.ETIMEDOUT : AxiosError.ECONNABORTED,
+        config,
+        request));
+
+      // Clean up request
+      request = null;
+    };
+
+    // Add xsrf header
+    // This is only done if running in a standard browser environment.
+    // Specifically not if we're in a web worker, or react-native.
+    if (platform.isStandardBrowserEnv) {
+      // Add xsrf header
+      const xsrfValue = (config.withCredentials || isURLSameOrigin(fullPath))
+        && config.xsrfCookieName && cookies.read(config.xsrfCookieName);
+
+      if (xsrfValue) {
+        requestHeaders.set(config.xsrfHeaderName, xsrfValue);
+      }
+    }
+
+    // Remove Content-Type if data is undefined
+    requestData === undefined && requestHeaders.setContentType(null);
+
+    // Add headers to the request
+    if ('setRequestHeader' in request) {
+      utils.forEach(requestHeaders.toJSON(), function setRequestHeader(val, key) {
+        request.setRequestHeader(key, val);
+      });
+    }
+
+    // Add withCredentials to request if needed
+    if (!utils.isUndefined(config.withCredentials)) {
+      request.withCredentials = !!config.withCredentials;
+    }
+
+    // Add responseType to request if needed
+    if (responseType && responseType !== 'json') {
+      request.responseType = config.responseType;
+    }
+
+    // Handle progress if needed
+    if (typeof config.onDownloadProgress === 'function') {
+      request.addEventListener('progress', progressEventReducer(config.onDownloadProgress, true));
+    }
+
+    // Not all browsers support upload events
+    if (typeof config.onUploadProgress === 'function' && request.upload) {
+      request.upload.addEventListener('progress', progressEventReducer(config.onUploadProgress));
+    }
+
+    if (config.cancelToken || config.signal) {
+      // Handle cancellation
+      // eslint-disable-next-line func-names
+      onCanceled = cancel => {
+        if (!request) {
+          return;
+        }
+        reject(!cancel || cancel.type ? new CanceledError(null, config, request) : cancel);
+        request.abort();
+        request = null;
+      };
+
+      config.cancelToken && config.cancelToken.subscribe(onCanceled);
+      if (config.signal) {
+        config.signal.aborted ? onCanceled() : config.signal.addEventListener('abort', onCanceled);
+      }
+    }
+
+    const protocol = parseProtocol(fullPath);
+
+    if (protocol && platform.protocols.indexOf(protocol) === -1) {
+      reject(new AxiosError('Unsupported protocol ' + protocol + ':', AxiosError.ERR_BAD_REQUEST, config));
+      return;
+    }
+
+
+    // Send the request
+    request.send(requestData || null);
+  });
+}
+
+const adapters = {
+  http: httpAdapter,
+  xhr: xhrAdapter
+};
+
+const adapters$1 = {
+  getAdapter: (nameOrAdapter) => {
+    if(utils.isString(nameOrAdapter)){
+      const adapter = adapters[nameOrAdapter];
+
+      if (!nameOrAdapter) {
+        throw Error(
+          utils.hasOwnProp(nameOrAdapter) ?
+            `Adapter '${nameOrAdapter}' is not available in the build` :
+            `Can not resolve adapter '${nameOrAdapter}'`
+        );
+      }
+
+      return adapter
+    }
+
+    if (!utils.isFunction(nameOrAdapter)) {
+      throw new TypeError('adapter is not a function');
+    }
+
+    return nameOrAdapter;
+  },
+  adapters
+};
+
+const DEFAULT_CONTENT_TYPE = {
+  'Content-Type': 'application/x-www-form-urlencoded'
 };
 
 /**
- * Encodes URI in Rails format
+ * If the browser has an XMLHttpRequest object, use the XHR adapter, otherwise use the HTTP
+ * adapter
+ *
+ * @returns {Function}
  */
-const stringify = (object) => {
-    if (!isObject(object)) {
-        return '';
-    }
-    const values = Object.entries(object)
-        .reduce((prev, [k, v]) => {
-        if (Array.isArray(v)) {
-            const xs = v.map((x) => `${k}[]=${encodeURIComponent(x)}`);
-            return [...prev, ...xs];
-        }
-        if (v == undefined) {
-            return prev;
-        }
-        if (typeof v === 'string' ||
-            typeof v === 'number' ||
-            typeof v === 'boolean') {
-            return [...prev, `${k}=${encodeURIComponent(v)}`];
-        }
-        throw new TypeError('Encoding nested object is not supported');
-    }, [])
-        .join('&');
-    return values;
-};
-const railsQueryString = { stringify };
+function getDefaultAdapter() {
+  let adapter;
+  if (typeof XMLHttpRequest !== 'undefined') {
+    // For browsers use XHR adapter
+    adapter = adapters$1.getAdapter('xhr');
+  } else if (typeof process !== 'undefined' && utils.kindOf(process) === 'process') {
+    // For node use HTTP adapter
+    adapter = adapters$1.getAdapter('http');
+  }
+  return adapter;
+}
 
-const transformKeys = (data, transform) => {
-    if (Array.isArray(data)) {
-        return data.map((value) => transformKeys(value, transform));
+/**
+ * It takes a string, tries to parse it, and if it fails, it returns the stringified version
+ * of the input
+ *
+ * @param {any} rawValue - The value to be stringified.
+ * @param {Function} parser - A function that parses a string into a JavaScript object.
+ * @param {Function} encoder - A function that takes a value and returns a string.
+ *
+ * @returns {string} A stringified version of the rawValue.
+ */
+function stringifySafely(rawValue, parser, encoder) {
+  if (utils.isString(rawValue)) {
+    try {
+      (parser || JSON.parse)(rawValue);
+      return utils.trim(rawValue);
+    } catch (e) {
+      if (e.name !== 'SyntaxError') {
+        throw e;
+      }
     }
-    if (isObject(data)) {
-        return Object.fromEntries(Object.entries(data).map(([key, value]) => [
-            transform(key),
-            transformKeys(value, transform),
-        ]));
+  }
+
+  return (encoder || JSON.stringify)(rawValue);
+}
+
+const defaults = {
+
+  transitional: transitionalDefaults,
+
+  adapter: getDefaultAdapter(),
+
+  transformRequest: [function transformRequest(data, headers) {
+    const contentType = headers.getContentType() || '';
+    const hasJSONContentType = contentType.indexOf('application/json') > -1;
+    const isObjectPayload = utils.isObject(data);
+
+    if (isObjectPayload && utils.isHTMLForm(data)) {
+      data = new FormData(data);
     }
+
+    const isFormData = utils.isFormData(data);
+
+    if (isFormData) {
+      if (!hasJSONContentType) {
+        return data;
+      }
+      return hasJSONContentType ? JSON.stringify(formDataToJSON(data)) : data;
+    }
+
+    if (utils.isArrayBuffer(data) ||
+      utils.isBuffer(data) ||
+      utils.isStream(data) ||
+      utils.isFile(data) ||
+      utils.isBlob(data)
+    ) {
+      return data;
+    }
+    if (utils.isArrayBufferView(data)) {
+      return data.buffer;
+    }
+    if (utils.isURLSearchParams(data)) {
+      headers.setContentType('application/x-www-form-urlencoded;charset=utf-8', false);
+      return data.toString();
+    }
+
+    let isFileList;
+
+    if (isObjectPayload) {
+      if (contentType.indexOf('application/x-www-form-urlencoded') > -1) {
+        return toURLEncodedForm(data, this.formSerializer).toString();
+      }
+
+      if ((isFileList = utils.isFileList(data)) || contentType.indexOf('multipart/form-data') > -1) {
+        const _FormData = this.env && this.env.FormData;
+
+        return toFormData(
+          isFileList ? {'files[]': data} : data,
+          _FormData && new _FormData(),
+          this.formSerializer
+        );
+      }
+    }
+
+    if (isObjectPayload || hasJSONContentType ) {
+      headers.setContentType('application/json', false);
+      return stringifySafely(data);
+    }
+
     return data;
+  }],
+
+  transformResponse: [function transformResponse(data) {
+    const transitional = this.transitional || defaults.transitional;
+    const forcedJSONParsing = transitional && transitional.forcedJSONParsing;
+    const JSONRequested = this.responseType === 'json';
+
+    if (data && utils.isString(data) && ((forcedJSONParsing && !this.responseType) || JSONRequested)) {
+      const silentJSONParsing = transitional && transitional.silentJSONParsing;
+      const strictJSONParsing = !silentJSONParsing && JSONRequested;
+
+      try {
+        return JSON.parse(data);
+      } catch (e) {
+        if (strictJSONParsing) {
+          if (e.name === 'SyntaxError') {
+            throw AxiosError.from(e, AxiosError.ERR_BAD_RESPONSE, this, null, this.response);
+          }
+          throw e;
+        }
+      }
+    }
+
+    return data;
+  }],
+
+  /**
+   * A timeout in milliseconds to abort a request. If set to 0 (default) a
+   * timeout is not created.
+   */
+  timeout: 0,
+
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
+
+  maxContentLength: -1,
+  maxBodyLength: -1,
+
+  env: {
+    FormData: platform.classes.FormData,
+    Blob: platform.classes.Blob
+  },
+
+  validateStatus: function validateStatus(status) {
+    return status >= 200 && status < 300;
+  },
+
+  headers: {
+    common: {
+      'Accept': 'application/json, text/plain, */*'
+    }
+  }
 };
 
-class SerializerNativeImpl {
-    serialize(type, rawData) {
-        if (rawData == undefined) {
-            return;
-        }
-        const data = transformKeys(rawData, changeCase.snakeCase);
-        switch (type) {
-            case 'application/json': {
-                return JSON.stringify(data);
-            }
-            case 'multipart/form-data': {
-                const formData = new ponyfills.FormData();
-                for (const [key, value] of Object.entries(flattenObject(data))) {
-                    // `form-data` module has an issue that they doesn't set filename
-                    // https://github.com/neet/masto.js/issues/481
-                    // https://github.com/mastodon/mastodon/issues/17622
-                    if (globalThis.Buffer != undefined &&
-                        value instanceof globalThis.Buffer) {
-                        // We set `blob` as filename, which is the default for Blob defined by the spec
-                        // https://developer.mozilla.org/en-US/docs/Web/API/FormData/append
-                        formData.append(key, value, 'blob');
-                        continue;
-                    }
-                    formData.append(key, value);
-                }
-                return formData;
-            }
-            default: {
-                return;
-            }
-        }
-    }
-    serializeQueryString(rawData) {
-        const data = transformKeys(rawData, changeCase.snakeCase);
-        return railsQueryString.stringify(data);
-    }
-    deserialize(type, data) {
-        switch (type) {
-            case 'application/json': {
-                try {
-                    return transformKeys(JSON.parse(data), changeCase.camelCase);
-                }
-                catch (_a) {
-                    return undefined;
-                }
-            }
-            default: {
-                throw new MastoDeserializeError(`Unknown content type ${type} returned from the server.`, type, data);
-            }
-        }
-    }
+utils.forEach(['delete', 'get', 'head'], function forEachMethodNoData(method) {
+  defaults.headers[method] = {};
+});
+
+utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
+  defaults.headers[method] = utils.merge(DEFAULT_CONTENT_TYPE);
+});
+
+/**
+ * Transform the data for a request or a response
+ *
+ * @param {Array|Function} fns A single function or Array of functions
+ * @param {?Object} response The response object
+ *
+ * @returns {*} The resulting transformed data
+ */
+function transformData(fns, response) {
+  const config = this || defaults;
+  const context = response || config;
+  const headers = AxiosHeaders.from(context.headers);
+  let data = context.data;
+
+  utils.forEach(fns, function transform(fn) {
+    data = fn.call(config, data, headers.normalize(), response ? response.status : undefined);
+  });
+
+  headers.normalize();
+
+  return data;
+}
+
+function isCancel(value) {
+  return !!(value && value.__CANCEL__);
 }
 
 /**
- * Mastodon streaming api wrapper
+ * Throws a `CanceledError` if cancellation has been requested.
+ *
+ * @param {Object} config The config that is to be used for the request
+ *
+ * @returns {void}
  */
-class WsEventsNativeImpl extends EventEmitter {
-    constructor(ws, serializer) {
-        super();
-        this.ws = ws;
-        this.serializer = serializer;
-        /**
-         * Parse JSON data and emit it as an event
-         * @param message Websocket message
-         */
-        this.handleMessage = ({ data }) => {
-            const { event, payload } = this.serializer.deserialize('application/json', data);
-            // https://github.com/neet/masto.js/issues/750
-            if (event === 'delete') {
-                return void this.emit(event, payload);
-            }
-            let args = [];
-            try {
-                args.push(this.serializer.deserialize('application/json', payload));
-            }
-            catch (_a) {
-                args = [];
-            }
-            this.emit(event, ...args);
-        };
-    }
-    /**
-     * Connect to the websocket endpoint
-     * @param url URL of the websocket endpoint
-     * @param protocols Subprotocol(s) for `Sec-Websocket-Protocol`
-     * @param params URL parameters
-     */
-    static connect(url, serializer, protocols) {
-        return new Promise((resolve, reject) => {
-            const ws = new WebSocket(url, protocols);
-            const instance = new WsEventsNativeImpl(ws, serializer);
-            ws.addEventListener('message', instance.handleMessage);
-            ws.addEventListener('error', reject);
-            ws.addEventListener('open', () => resolve(instance));
-        });
-    }
-    /**
-     * Disconnect from the websocket endpoint
-     */
-    disconnect() {
-        if (!this.ws)
-            return;
-        this.ws.close();
-    }
-}
-class WsNativeImpl {
-    constructor(config, serializer) {
-        this.config = config;
-        this.serializer = serializer;
-    }
-    stream(path, params = {}) {
-        return WsEventsNativeImpl.connect(this.config.resolveWebsocketPath(path, params), this.serializer, this.config.createWebsocketProtocols());
-    }
+function throwIfCancellationRequested(config) {
+  if (config.cancelToken) {
+    config.cancelToken.throwIfRequested();
+  }
+
+  if (config.signal && config.signal.aborted) {
+    throw new CanceledError();
+  }
 }
 
-const login = (params) => __awaiter(void 0, void 0, void 0, function* () {
-    const draft = {
-        url: params.url,
-        streamingApiUrl: '',
-        logLevel: params.logLevel,
-        accessToken: params.accessToken,
-        timeout: params.timeout,
-        defaultRequestInit: params.defaultRequestInit,
-        disableVersionCheck: params.disableVersionCheck,
-        disableDeprecatedWarning: params.disableDeprecatedWarning,
-    };
-    const serializer = new SerializerNativeImpl();
-    {
-        const config = new MastoConfig(draft, serializer);
-        const http = new HttpNativeImpl(serializer, config);
-        const instance = yield new InstanceRepository$1(http, config).fetch();
-        draft.version = new semver.SemVer(instance.version);
-        draft.streamingApiUrl = instance.urls.streamingApi;
+/**
+ * Dispatch a request to the server using the configured adapter.
+ *
+ * @param {object} config The config that is to be used for the request
+ *
+ * @returns {Promise} The Promise to be fulfilled
+ */
+function dispatchRequest(config) {
+  throwIfCancellationRequested(config);
+
+  config.headers = AxiosHeaders.from(config.headers);
+
+  // Transform request data
+  config.data = transformData.call(
+    config,
+    config.transformRequest
+  );
+
+  const adapter = config.adapter || defaults.adapter;
+
+  return adapter(config).then(function onAdapterResolution(response) {
+    throwIfCancellationRequested(config);
+
+    // Transform response data
+    response.data = transformData.call(
+      config,
+      config.transformResponse,
+      response
+    );
+
+    response.headers = AxiosHeaders.from(response.headers);
+
+    return response;
+  }, function onAdapterRejection(reason) {
+    if (!isCancel(reason)) {
+      throwIfCancellationRequested(config);
+
+      // Transform response data
+      if (reason && reason.response) {
+        reason.response.data = transformData.call(
+          config,
+          config.transformResponse,
+          reason.response
+        );
+        reason.response.headers = AxiosHeaders.from(reason.response.headers);
+      }
     }
-    const config = new MastoConfig(draft, serializer);
-    const logger = new LoggerConsoleImpl(config.getLogLevel());
-    const ws = new WsNativeImpl(config, serializer);
-    const http = new HttpNativeImpl(serializer, config, logger);
-    logger.debug('Masto.js initialised', config);
-    return new Client(http, ws, config);
+
+    return Promise.reject(reason);
+  });
+}
+
+/**
+ * Config-specific merge-function which creates a new config-object
+ * by merging two configuration objects together.
+ *
+ * @param {Object} config1
+ * @param {Object} config2
+ *
+ * @returns {Object} New object resulting from merging config2 to config1
+ */
+function mergeConfig(config1, config2) {
+  // eslint-disable-next-line no-param-reassign
+  config2 = config2 || {};
+  const config = {};
+
+  function getMergedValue(target, source) {
+    if (utils.isPlainObject(target) && utils.isPlainObject(source)) {
+      return utils.merge(target, source);
+    } else if (utils.isPlainObject(source)) {
+      return utils.merge({}, source);
+    } else if (utils.isArray(source)) {
+      return source.slice();
+    }
+    return source;
+  }
+
+  // eslint-disable-next-line consistent-return
+  function mergeDeepProperties(prop) {
+    if (!utils.isUndefined(config2[prop])) {
+      return getMergedValue(config1[prop], config2[prop]);
+    } else if (!utils.isUndefined(config1[prop])) {
+      return getMergedValue(undefined, config1[prop]);
+    }
+  }
+
+  // eslint-disable-next-line consistent-return
+  function valueFromConfig2(prop) {
+    if (!utils.isUndefined(config2[prop])) {
+      return getMergedValue(undefined, config2[prop]);
+    }
+  }
+
+  // eslint-disable-next-line consistent-return
+  function defaultToConfig2(prop) {
+    if (!utils.isUndefined(config2[prop])) {
+      return getMergedValue(undefined, config2[prop]);
+    } else if (!utils.isUndefined(config1[prop])) {
+      return getMergedValue(undefined, config1[prop]);
+    }
+  }
+
+  // eslint-disable-next-line consistent-return
+  function mergeDirectKeys(prop) {
+    if (prop in config2) {
+      return getMergedValue(config1[prop], config2[prop]);
+    } else if (prop in config1) {
+      return getMergedValue(undefined, config1[prop]);
+    }
+  }
+
+  const mergeMap = {
+    'url': valueFromConfig2,
+    'method': valueFromConfig2,
+    'data': valueFromConfig2,
+    'baseURL': defaultToConfig2,
+    'transformRequest': defaultToConfig2,
+    'transformResponse': defaultToConfig2,
+    'paramsSerializer': defaultToConfig2,
+    'timeout': defaultToConfig2,
+    'timeoutMessage': defaultToConfig2,
+    'withCredentials': defaultToConfig2,
+    'adapter': defaultToConfig2,
+    'responseType': defaultToConfig2,
+    'xsrfCookieName': defaultToConfig2,
+    'xsrfHeaderName': defaultToConfig2,
+    'onUploadProgress': defaultToConfig2,
+    'onDownloadProgress': defaultToConfig2,
+    'decompress': defaultToConfig2,
+    'maxContentLength': defaultToConfig2,
+    'maxBodyLength': defaultToConfig2,
+    'beforeRedirect': defaultToConfig2,
+    'transport': defaultToConfig2,
+    'httpAgent': defaultToConfig2,
+    'httpsAgent': defaultToConfig2,
+    'cancelToken': defaultToConfig2,
+    'socketPath': defaultToConfig2,
+    'responseEncoding': defaultToConfig2,
+    'validateStatus': mergeDirectKeys
+  };
+
+  utils.forEach(Object.keys(config1).concat(Object.keys(config2)), function computeConfigValue(prop) {
+    const merge = mergeMap[prop] || mergeDeepProperties;
+    const configValue = merge(prop);
+    (utils.isUndefined(configValue) && merge !== mergeDirectKeys) || (config[prop] = configValue);
+  });
+
+  return config;
+}
+
+const validators$1 = {};
+
+// eslint-disable-next-line func-names
+['object', 'boolean', 'number', 'function', 'string', 'symbol'].forEach((type, i) => {
+  validators$1[type] = function validator(thing) {
+    return typeof thing === type || 'a' + (i < 1 ? 'n ' : ' ') + type;
+  };
 });
 
-exports.BaseHttp = BaseHttp;
-exports.BaseLogger = BaseLogger;
-exports.HttpNativeImpl = HttpNativeImpl;
-exports.LogLevel = LogLevel;
-exports.LoggerConsoleImpl = LoggerConsoleImpl;
-exports.MastoConfig = MastoConfig;
-exports.Paginator = Paginator;
-exports.SerializerNativeImpl = SerializerNativeImpl;
-exports.WsEventsNativeImpl = WsEventsNativeImpl;
-exports.WsNativeImpl = WsNativeImpl;
-exports.login = login;
-exports.mastodon = index;
+const deprecatedWarnings = {};
+
+/**
+ * Transitional option validator
+ *
+ * @param {function|boolean?} validator - set to false if the transitional option has been removed
+ * @param {string?} version - deprecated version / removed since version
+ * @param {string?} message - some message with additional info
+ *
+ * @returns {function}
+ */
+validators$1.transitional = function transitional(validator, version, message) {
+  function formatMessage(opt, desc) {
+    return '[Axios v' + VERSION + '] Transitional option \'' + opt + '\'' + desc + (message ? '. ' + message : '');
+  }
+
+  // eslint-disable-next-line func-names
+  return (value, opt, opts) => {
+    if (validator === false) {
+      throw new AxiosError(
+        formatMessage(opt, ' has been removed' + (version ? ' in ' + version : '')),
+        AxiosError.ERR_DEPRECATED
+      );
+    }
+
+    if (version && !deprecatedWarnings[opt]) {
+      deprecatedWarnings[opt] = true;
+      // eslint-disable-next-line no-console
+      console.warn(
+        formatMessage(
+          opt,
+          ' has been deprecated since v' + version + ' and will be removed in the near future'
+        )
+      );
+    }
+
+    return validator ? validator(value, opt, opts) : true;
+  };
+};
+
+/**
+ * Assert object's properties type
+ *
+ * @param {object} options
+ * @param {object} schema
+ * @param {boolean?} allowUnknown
+ *
+ * @returns {object}
+ */
+
+function assertOptions(options, schema, allowUnknown) {
+  if (typeof options !== 'object') {
+    throw new AxiosError('options must be an object', AxiosError.ERR_BAD_OPTION_VALUE);
+  }
+  const keys = Object.keys(options);
+  let i = keys.length;
+  while (i-- > 0) {
+    const opt = keys[i];
+    const validator = schema[opt];
+    if (validator) {
+      const value = options[opt];
+      const result = value === undefined || validator(value, opt, options);
+      if (result !== true) {
+        throw new AxiosError('option ' + opt + ' must be ' + result, AxiosError.ERR_BAD_OPTION_VALUE);
+      }
+      continue;
+    }
+    if (allowUnknown !== true) {
+      throw new AxiosError('Unknown option ' + opt, AxiosError.ERR_BAD_OPTION);
+    }
+  }
+}
+
+const validator = {
+  assertOptions,
+  validators: validators$1
+};
+
+const validators = validator.validators;
+
+/**
+ * Create a new instance of Axios
+ *
+ * @param {Object} instanceConfig The default config for the instance
+ *
+ * @return {Axios} A new instance of Axios
+ */
+class Axios {
+  constructor(instanceConfig) {
+    this.defaults = instanceConfig;
+    this.interceptors = {
+      request: new InterceptorManager(),
+      response: new InterceptorManager()
+    };
+  }
+
+  /**
+   * Dispatch a request
+   *
+   * @param {String|Object} configOrUrl The config specific for this request (merged with this.defaults)
+   * @param {?Object} config
+   *
+   * @returns {Promise} The Promise to be fulfilled
+   */
+  request(configOrUrl, config) {
+    /*eslint no-param-reassign:0*/
+    // Allow for axios('example/url'[, config]) a la fetch API
+    if (typeof configOrUrl === 'string') {
+      config = config || {};
+      config.url = configOrUrl;
+    } else {
+      config = configOrUrl || {};
+    }
+
+    config = mergeConfig(this.defaults, config);
+
+    const {transitional, paramsSerializer} = config;
+
+    if (transitional !== undefined) {
+      validator.assertOptions(transitional, {
+        silentJSONParsing: validators.transitional(validators.boolean),
+        forcedJSONParsing: validators.transitional(validators.boolean),
+        clarifyTimeoutError: validators.transitional(validators.boolean)
+      }, false);
+    }
+
+    if (paramsSerializer !== undefined) {
+      validator.assertOptions(paramsSerializer, {
+        encode: validators.function,
+        serialize: validators.function
+      }, true);
+    }
+
+    // Set config.method
+    config.method = (config.method || this.defaults.method || 'get').toLowerCase();
+
+    // Flatten headers
+    const defaultHeaders = config.headers && utils.merge(
+      config.headers.common,
+      config.headers[config.method]
+    );
+
+    defaultHeaders && utils.forEach(
+      ['delete', 'get', 'head', 'post', 'put', 'patch', 'common'],
+      function cleanHeaderConfig(method) {
+        delete config.headers[method];
+      }
+    );
+
+    config.headers = new AxiosHeaders(config.headers, defaultHeaders);
+
+    // filter out skipped interceptors
+    const requestInterceptorChain = [];
+    let synchronousRequestInterceptors = true;
+    this.interceptors.request.forEach(function unshiftRequestInterceptors(interceptor) {
+      if (typeof interceptor.runWhen === 'function' && interceptor.runWhen(config) === false) {
+        return;
+      }
+
+      synchronousRequestInterceptors = synchronousRequestInterceptors && interceptor.synchronous;
+
+      requestInterceptorChain.unshift(interceptor.fulfilled, interceptor.rejected);
+    });
+
+    const responseInterceptorChain = [];
+    this.interceptors.response.forEach(function pushResponseInterceptors(interceptor) {
+      responseInterceptorChain.push(interceptor.fulfilled, interceptor.rejected);
+    });
+
+    let promise;
+    let i = 0;
+    let len;
+
+    if (!synchronousRequestInterceptors) {
+      const chain = [dispatchRequest.bind(this), undefined];
+      chain.unshift.apply(chain, requestInterceptorChain);
+      chain.push.apply(chain, responseInterceptorChain);
+      len = chain.length;
+
+      promise = Promise.resolve(config);
+
+      while (i < len) {
+        promise = promise.then(chain[i++], chain[i++]);
+      }
+
+      return promise;
+    }
+
+    len = requestInterceptorChain.length;
+
+    let newConfig = config;
+
+    i = 0;
+
+    while (i < len) {
+      const onFulfilled = requestInterceptorChain[i++];
+      const onRejected = requestInterceptorChain[i++];
+      try {
+        newConfig = onFulfilled(newConfig);
+      } catch (error) {
+        onRejected.call(this, error);
+        break;
+      }
+    }
+
+    try {
+      promise = dispatchRequest.call(this, newConfig);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+
+    i = 0;
+    len = responseInterceptorChain.length;
+
+    while (i < len) {
+      promise = promise.then(responseInterceptorChain[i++], responseInterceptorChain[i++]);
+    }
+
+    return promise;
+  }
+
+  getUri(config) {
+    config = mergeConfig(this.defaults, config);
+    const fullPath = buildFullPath(config.baseURL, config.url);
+    return buildURL(fullPath, config.params, config.paramsSerializer);
+  }
+}
+
+// Provide aliases for supported request methods
+utils.forEach(['delete', 'get', 'head', 'options'], function forEachMethodNoData(method) {
+  /*eslint func-names:0*/
+  Axios.prototype[method] = function(url, config) {
+    return this.request(mergeConfig(config || {}, {
+      method,
+      url,
+      data: (config || {}).data
+    }));
+  };
+});
+
+utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
+  /*eslint func-names:0*/
+
+  function generateHTTPMethod(isForm) {
+    return function httpMethod(url, data, config) {
+      return this.request(mergeConfig(config || {}, {
+        method,
+        headers: isForm ? {
+          'Content-Type': 'multipart/form-data'
+        } : {},
+        url,
+        data
+      }));
+    };
+  }
+
+  Axios.prototype[method] = generateHTTPMethod();
+
+  Axios.prototype[method + 'Form'] = generateHTTPMethod(true);
+});
+
+/**
+ * A `CancelToken` is an object that can be used to request cancellation of an operation.
+ *
+ * @param {Function} executor The executor function.
+ *
+ * @returns {CancelToken}
+ */
+class CancelToken {
+  constructor(executor) {
+    if (typeof executor !== 'function') {
+      throw new TypeError('executor must be a function.');
+    }
+
+    let resolvePromise;
+
+    this.promise = new Promise(function promiseExecutor(resolve) {
+      resolvePromise = resolve;
+    });
+
+    const token = this;
+
+    // eslint-disable-next-line func-names
+    this.promise.then(cancel => {
+      if (!token._listeners) return;
+
+      let i = token._listeners.length;
+
+      while (i-- > 0) {
+        token._listeners[i](cancel);
+      }
+      token._listeners = null;
+    });
+
+    // eslint-disable-next-line func-names
+    this.promise.then = onfulfilled => {
+      let _resolve;
+      // eslint-disable-next-line func-names
+      const promise = new Promise(resolve => {
+        token.subscribe(resolve);
+        _resolve = resolve;
+      }).then(onfulfilled);
+
+      promise.cancel = function reject() {
+        token.unsubscribe(_resolve);
+      };
+
+      return promise;
+    };
+
+    executor(function cancel(message, config, request) {
+      if (token.reason) {
+        // Cancellation has already been requested
+        return;
+      }
+
+      token.reason = new CanceledError(message, config, request);
+      resolvePromise(token.reason);
+    });
+  }
+
+  /**
+   * Throws a `CanceledError` if cancellation has been requested.
+   */
+  throwIfRequested() {
+    if (this.reason) {
+      throw this.reason;
+    }
+  }
+
+  /**
+   * Subscribe to the cancel signal
+   */
+
+  subscribe(listener) {
+    if (this.reason) {
+      listener(this.reason);
+      return;
+    }
+
+    if (this._listeners) {
+      this._listeners.push(listener);
+    } else {
+      this._listeners = [listener];
+    }
+  }
+
+  /**
+   * Unsubscribe from the cancel signal
+   */
+
+  unsubscribe(listener) {
+    if (!this._listeners) {
+      return;
+    }
+    const index = this._listeners.indexOf(listener);
+    if (index !== -1) {
+      this._listeners.splice(index, 1);
+    }
+  }
+
+  /**
+   * Returns an object that contains a new `CancelToken` and a function that, when called,
+   * cancels the `CancelToken`.
+   */
+  static source() {
+    let cancel;
+    const token = new CancelToken(function executor(c) {
+      cancel = c;
+    });
+    return {
+      token,
+      cancel
+    };
+  }
+}
+
+/**
+ * Syntactic sugar for invoking a function and expanding an array for arguments.
+ *
+ * Common use case would be to use `Function.prototype.apply`.
+ *
+ *  ```js
+ *  function f(x, y, z) {}
+ *  var args = [1, 2, 3];
+ *  f.apply(null, args);
+ *  ```
+ *
+ * With `spread` this example can be re-written.
+ *
+ *  ```js
+ *  spread(function(x, y, z) {})([1, 2, 3]);
+ *  ```
+ *
+ * @param {Function} callback
+ *
+ * @returns {Function}
+ */
+function spread(callback) {
+  return function wrap(arr) {
+    return callback.apply(null, arr);
+  };
+}
+
+/**
+ * Determines whether the payload is an error thrown by Axios
+ *
+ * @param {*} payload The value to test
+ *
+ * @returns {boolean} True if the payload is an error thrown by Axios, otherwise false
+ */
+function isAxiosError(payload) {
+  return utils.isObject(payload) && (payload.isAxiosError === true);
+}
+
+/**
+ * Create an instance of Axios
+ *
+ * @param {Object} defaultConfig The default config for the instance
+ *
+ * @returns {Axios} A new instance of Axios
+ */
+function createInstance(defaultConfig) {
+  const context = new Axios(defaultConfig);
+  const instance = bind(Axios.prototype.request, context);
+
+  // Copy axios.prototype to instance
+  utils.extend(instance, Axios.prototype, context, {allOwnKeys: true});
+
+  // Copy context to instance
+  utils.extend(instance, context, null, {allOwnKeys: true});
+
+  // Factory for creating new instances
+  instance.create = function create(instanceConfig) {
+    return createInstance(mergeConfig(defaultConfig, instanceConfig));
+  };
+
+  return instance;
+}
+
+// Create the default instance to be exported
+const axios = createInstance(defaults);
+
+// Expose Axios class to allow class inheritance
+axios.Axios = Axios;
+
+// Expose Cancel & CancelToken
+axios.CanceledError = CanceledError;
+axios.CancelToken = CancelToken;
+axios.isCancel = isCancel;
+axios.VERSION = VERSION;
+axios.toFormData = toFormData;
+
+// Expose AxiosError class
+axios.AxiosError = AxiosError;
+
+// alias for CanceledError for backward compatibility
+axios.Cancel = axios.CanceledError;
+
+// Expose all/spread
+axios.all = function all(promises) {
+  return Promise.all(promises);
+};
+
+axios.spread = spread;
+
+// Expose isAxiosError
+axios.isAxiosError = isAxiosError;
+
+axios.formToJSON = thing => {
+  return formDataToJSON(utils.isHTMLForm(thing) ? new FormData(thing) : thing);
+};
+
+module.exports = axios;
+//# sourceMappingURL=axios.cjs.map
 
 
 /***/ }),
@@ -21581,14 +26744,6 @@ module.exports = JSON.parse('[[[0,44],"disallowed_STD3_valid"],[[45,46],"valid"]
 
 "use strict";
 module.exports = require("assert");
-
-/***/ }),
-
-/***/ 4293:
-/***/ ((module) => {
-
-"use strict";
-module.exports = require("buffer");
 
 /***/ }),
 
@@ -21685,6 +26840,14 @@ module.exports = require("stream");
 
 "use strict";
 module.exports = require("tls");
+
+/***/ }),
+
+/***/ 3867:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("tty");
 
 /***/ }),
 
