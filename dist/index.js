@@ -232,7 +232,7 @@ const processFeed = async (feedUrl) => {
     if (
       jsonCache[item.url].lastTootTimestamp === undefined ||
       (nbTootsPerItem > jsonCache[item.url].toots.length &&
-        Date.now() <
+        Date.now() >
           jsonCache[item.url].lastTootTimestamp +
             delayTootsSameItem * 60 * 1000)
     ) {

@@ -42,28 +42,14 @@ jobs:
       - name: Checkout 🛎️
         uses: actions/checkout@v3
 
-      - name: Set up Node.js ⚙️
-        uses: actions/setup-node@v3
-        with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
-
-      - name: Install dependencies 📦
-        run: npm ci
-
       - name: JSON Feed to Mastodon 🦣
         uses: nhoizey/github-action-jsonfeed-to-mastodon@v1
-        env:
-          RUNNER_TEMPORARY_DIRECTORY: ${{ runner.temp }}
         with:
           feedUrl: "https://nicolas-hoizey.photo/feeds/mastodon/photos-test.json"
           mastodonInstance: ${{ secrets.TEST_MASTODON_INSTANCE }}
           mastodonToken: ${{ secrets.TEST_MASTODON_TOKEN }}
           cacheDirectory: ${{ env.CACHE_DIRECTORY }}
           globalDelayToots: 1
-
-      - name: Pull any changes 📥
-        run: git pull
 
       - name: Commit and push 📤
         uses: stefanzweifel/git-auto-commit-action@v4
