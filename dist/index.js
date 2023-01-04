@@ -269,7 +269,7 @@ const processFeed = async (feedUrl) => {
       jsonCache[itemToPosse.url].lastTootTimestamp = Date.now();
 
       const { context = {} } = github;
-      core.notice(JSON.stringify(context, null, 2));
+      core.notice(JSON.stringify(context.payload.repository, null, 2));
       core.notice(`Currently in ${__dirname}`);
       if (!fs.existsSync(cacheDirectory)) {
         core.notice(`Creating ${cacheDirectory}`);
