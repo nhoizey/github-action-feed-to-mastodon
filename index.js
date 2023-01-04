@@ -21,7 +21,7 @@ async function run() {
     }
 
     if (Date.now() < jsonTimestamp.timestamp + globalDelayToots * 60 * 1000) {
-      core.info(`Too soon…`);
+      core.warning(`Too soon…`);
       return;
     }
 
