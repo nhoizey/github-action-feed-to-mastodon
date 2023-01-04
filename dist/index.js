@@ -39,7 +39,7 @@ const createToot = async (tootData) => {
 
   // Helper Function to return function status
   const status = (code, msg) => {
-    core.info(`[${code}] ${msg}`);
+    core.notice(`[${code}] ${msg}`);
     // TODO: no need to return
     return {
       statusCode: code,
@@ -203,7 +203,7 @@ const processFeed = async (feedUrl) => {
     jsonCache = require(path.join(cacheDirectory, cacheFile));
   }
 
-  core.info(`Fetching ${feedUrl} …`);
+  core.notice(`Fetching ${feedUrl} …`);
   const feedContent = await fetch(feedUrl).then((response) => response.json());
 
   let items = feedContent.items;
@@ -260,15 +260,15 @@ const processFeed = async (feedUrl) => {
   const itemToPosse = candidates[Math.floor(Math.random() * candidates.length)];
 
   try {
-    core.info(`Attempting to create toot for item "${itemToPosse.title}"`);
+    core.notice(`Attempting to create toot for item "${itemToPosse.title}"`);
     const tootUrl = await createToot(itemToPosse);
     // TODO: better test?
     if (tootUrl && tootUrl.startsWith(mastodonInstance)) {
       jsonCache[itemToPosse.url].toots.push(tootUrl);
       jsonCache[itemToPosse.url].lastTootTimestamp = Date.now();
 
-      core.info(cacheDirectory);
-      core.info(`Currently in ${__dirname}`);
+      core.notice(`Currently in ${__dirname}`);
+      core.notice(`Cache directory: ${cacheDirectory}`);
       if (!fs.existsSync(cacheDirectory)) {
         core.notice(`Creating ${cacheDirectory}`);
         fs.mkdirSync(cacheDirectory, { recursive: true });
@@ -26958,9 +26958,9 @@ async function run() {
 
     const tootUrl = await processFeed(feedUrl);
     if (tootUrl) {
-      core.info(`Success! ${tootUrl}`);
+      core.notice(`Success! ${tootUrl}`);
     } else {
-      core.info("No item to toot");
+      core.notice("No item to toot");
     }
     core.setOutput("tootUrl", tootUrl);
   } catch (error) {

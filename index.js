@@ -27,9 +27,9 @@ async function run() {
 
     const tootUrl = await processFeed(feedUrl);
     if (tootUrl) {
-      core.info(`Success! ${tootUrl}`);
+      core.notice(`Success! ${tootUrl}`);
     } else {
-      core.info("No item to toot");
+      core.notice("No item to toot");
     }
     core.setOutput("tootUrl", tootUrl);
   } catch (error) {
