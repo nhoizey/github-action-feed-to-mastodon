@@ -23,12 +23,14 @@ inputs:
   delayTootsSameItem:
     description: "Delay (in minutes) between any toot from this feed for the same item (default: 90 days)"
     default: 129600
+  cacheDirectory: "Path to the directory where cache files are stored"
+    default: ".cache"
   cacheFile:
-    description: "Path to the JSON file caching data from the feed and toots"
-    default: ".cache/jsonfeed-to-mastodon.json"
+    description: "Name of the JSON file caching data from the feed and toots"
+    default: "jsonfeed-to-mastodon.json"
   cacheTimestampFile:
-    description: "Path to the JSON file caching the timestamp of the last toot"
-    default: ".cache/jsonfeed-to-mastodon-timestamp.json"
+    description: "Name of the JSON file caching the timestamp of the last toot"
+    default: "jsonfeed-to-mastodon-timestamp.json"
 outputs:
   tootUrl: # output will be available to future steps
     description: "URL to the latest toot created"

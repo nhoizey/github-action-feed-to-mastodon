@@ -177,6 +177,7 @@ module.exports = download;
 
 // Native Node modules
 const fs = __nccwpck_require__(5747);
+const path = __nccwpck_require__(2049);
 
 // Third party dependencies
 const core = __nccwpck_require__(2186);
@@ -192,13 +193,14 @@ const processFeed = async (feedUrl) => {
   });
   const nbTootsPerItem = core.getInput("nbTootsPerItem");
   const delayTootsSameItem = core.getInput("delayTootsSameItem");
+  const cacheDirectory = core.getInput("cacheDirectory");
   const cacheFile = core.getInput("cacheFile");
   const cacheTimestampFile = core.getInput("cacheTimestampFile");
 
   // Get values from existing cache
   let jsonCache = {};
-  if (fs.existsSync(cacheFile)) {
-    jsonCache = require(cacheFile);
+  if (fs.existsSync(path.join(cacheDirectory, cacheFile))) {
+    jsonCache = require(path.join(cacheDirectory, cacheFile));
   }
 
   core.info(`Fetching ${feedUrl} …`);
@@ -265,11 +267,18 @@ const processFeed = async (feedUrl) => {
       jsonCache[itemToPosse.url].toots.push(tootUrl);
       jsonCache[itemToPosse.url].lastTootTimestamp = Date.now();
 
-      fs.writeFileSync(cacheFile, JSON.stringify(jsonCache, null, 2), {
-        encoding: "utf8",
-      });
+      if (!fs.existsSync(cacheDirectory)) {
+        fs.mkdirSync(cacheDirectory, { recursive: true });
+      }
       fs.writeFileSync(
-        cacheTimestampFile,
+        path.join(cacheDirectory, cacheFile),
+        JSON.stringify(jsonCache, null, 2),
+        {
+          encoding: "utf8",
+        }
+      );
+      fs.writeFileSync(
+        path.join(cacheDirectory, cacheTimestampFile),
         JSON.stringify({ timestamp: Date.now() }, null, 2),
         {
           encoding: "utf8",
