@@ -270,19 +270,21 @@ const processFeed = async (feedUrl) => {
       notice(JSON.stringify(context.payload.repository, null, 2));
       notice(`Currently running in ${process.cwd()}`);
       notice(`Currently in ${__dirname}`);
-      if (!fs.existsSync(cacheDirectory)) {
+
+      const cacheDirectoryFullPath = path.join(process.cwd(), cacheDirectory);
+      if (!fs.existsSync(cacheDirectoryFullPath)) {
         notice(`Creating ${cacheDirectory}`);
-        fs.mkdirSync(cacheDirectory, { recursive: true });
+        fs.mkdirSync(cacheDirectoryFullPath, { recursive: true });
       }
       fs.writeFileSync(
-        path.join(cacheDirectory, cacheFile),
+        path.join(cacheDirectoryFullPath, cacheFile),
         JSON.stringify(jsonCache, null, 2),
         {
           encoding: "utf8",
         }
       );
       fs.writeFileSync(
-        path.join(cacheDirectory, cacheTimestampFile),
+        path.join(cacheDirectoryFullPath, cacheTimestampFile),
         JSON.stringify({ timestamp: Date.now() }, null, 2),
         {
           encoding: "utf8",
