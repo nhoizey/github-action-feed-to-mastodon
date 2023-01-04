@@ -1,5 +1,5 @@
 // Native Node modules
-const fs = require("fs");
+const { existsSync } = require("fs");
 
 // Third party dependencies
 const {
@@ -22,7 +22,7 @@ async function run() {
 
     // Get values from existing caches
     let jsonTimestamp = { timestamp: 0 };
-    if (fs.existsSync(cacheTimestampFile)) {
+    if (existsSync(cacheTimestampFile)) {
       jsonTimestamp = require(cacheTimestampFile);
       notice(`Previous attempt: ${jsonTimestamp.timestamp}`);
     } else {
