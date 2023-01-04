@@ -38,13 +38,13 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v4
 ```
 
-You can then enhance your action with a schedule as defined in GitHub's [events that trigger workflows](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule), for example to automate creation of a toot every Mondy at 8am:
+You can then enhance your action with a schedule as defined in GitHub's [events that trigger workflows](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule), for example to automate creation of a toot every Monday at 8am:
 
 ```yaml
 name: Create toots from JSON Feed items
 on:
   schedule:
-    # Run the action every Mondy at 8am
+    # Run the action every Monday at 8am
     # See https://crontab.guru/#0_8_*_*_1
     - cron: "0 8 * * 1"
   workflow_dispatch:
@@ -106,7 +106,7 @@ There are 2 JSON files in the cache:
   - the list of URLs for these toots
 - `cacheTimestampFile` keeps track of the timestamp of the last toot create by the action
 
-Make sure to have steps `Checkout` and `Commit and push` in your action, this is how the cache files are synchronized each time the action runs.
+Make sure to have steps "Checkout" and "Commit and push" in your action, this is how the cache files are synchronized each time the action runs.
 
 The cache prevents creating the same toot multiple times if you set `nbTootsPerItem` to 1 (which is the default).
 
