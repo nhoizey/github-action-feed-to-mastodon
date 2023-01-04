@@ -26,6 +26,7 @@ jobs:
         with:
           feedUrl: "https://nicolas-hoizey.photo/feeds/mastodon/photos.json"
           mastodonInstance: ${{ secrets.TEST_MASTODON_INSTANCE }}
+          mastodonToken: ${{ secrets.TEST_MASTODON_TOKEN }}
 
       - name: Pull any changes 📥
         run: git pull
