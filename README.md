@@ -79,9 +79,9 @@ There are 3 required **inputs**, used in the examples above, but also some optio
 
 | input                | required? | default                               | description                                                                                              |
 | -------------------- | --------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `feedUrl`            | Yes       |                                       | URL of the JSON Feed to fetch                                                                            |
-| `mastodonInstance`   | Yes       |                                       | The root URL of the Mastodon instance where the toot should be created                                   |
-| `mastodonToken`      | Yes       |                                       | Your access token for the Mastodon API, get it from `/settings/applications/new` on your instance        |
+| `feedUrl`            | **Yes**   |                                       | URL of the JSON Feed to fetch                                                                            |
+| `mastodonInstance`   | **Yes**   |                                       | The root URL of the Mastodon instance where the toot should be created                                   |
+| `mastodonToken`      | **Yes**   |                                       | Your access token for the Mastodon API, get it from `/settings/applications/new` on your instance        |
 | `nbTootsPerItem`     | No        | 1                                     | Number of toots that can be created from the same item                                                   |
 | `globalDelayToots`   | No        | 1440 (1 day)                          | Delay (in minutes) between any toot from this feed                                                       |
 | `delayTootsSameItem` | No        | 129600 (90 days)                      | Delay (in minutes) between any toot for the same item from this feed (used only if `nbTootsPerItem > 1`) |
