@@ -24,6 +24,53 @@ A GitHub Action that creates messages (toots) on your Mastodon account from JSON
 
 ## Example usage
 
-```yaml
+I recommend trying first an action required a manual action, to test the settings.
 
+```yaml
+name: Create toots from JSON Feed items
+on:
+  workflow_dispatch:
+
+env:
+  CACHE_DIRECTORY: ".cache"
+
+jobs:
+  Mastodon:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js ⚙️
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies 📦
+        run: npm ci
+
+      - name: JSON Feed to Mastodon 🦣
+        uses: nhoizey/github-action-jsonfeed-to-mastodon@v1
+        env:
+          RUNNER_TEMPORARY_DIRECTORY: ${{ runner.temp }}
+        with:
+          feedUrl: "https://nicolas-hoizey.photo/feeds/mastodon/photos-test.json"
+          mastodonInstance: ${{ secrets.TEST_MASTODON_INSTANCE }}
+          mastodonToken: ${{ secrets.TEST_MASTODON_TOKEN }}
+          cacheDirectory: ${{ env.CACHE_DIRECTORY }}
+          globalDelayToots: 1
+
+      - name: Pull any changes 📥
+        run: git pull
+
+      - name: Commit and push 📤
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "chore(cache): update Mastodon cache file (automated)"
+          file_pattern: "${{ env.CACHE_DIRECTORY }}/*.json"
+          skip_fetch: false
 ```
+
+You can then enhance your action with a schedule as defined in GitHub's [events that trigger workflows](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule).
