@@ -268,6 +268,7 @@ const processFeed = async (feedUrl) => {
       jsonCache[itemToPosse.url].lastTootTimestamp = Date.now();
 
       notice(JSON.stringify(context.payload.repository, null, 2));
+      notice(`Currently running in ${process.cwd()}`);
       notice(`Currently in ${__dirname}`);
       if (!fs.existsSync(cacheDirectory)) {
         notice(`Creating ${cacheDirectory}`);
@@ -29907,9 +29908,11 @@ async function run() {
     let jsonTimestamp = { timestamp: 0 };
     if (fs.existsSync(cacheTimestampFile)) {
       jsonTimestamp = require(cacheTimestampFile);
+      notice(`Previous attempt: ${jsonTimestamp.timestamp}`);
+    } else {
+      warning("No cache found.");
     }
 
-    notice(`Previous attemps: ${jsonTimestamp.timestamp}`);
     if (Date.now() < jsonTimestamp.timestamp + globalDelayToots * 60 * 1000) {
       warning(`Too soon…`);
       return;
