@@ -35,3 +35,5 @@ outputs:
 runs:
   using: "node16"
   main: "dist/index.js"
+  env:
+    RUNNER_TEMPORARY_DIRECTORY: ${{ runner.temp }}
