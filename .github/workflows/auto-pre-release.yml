@@ -1,4 +1,4 @@
-name: "Automate pre releases"
+name: "Automate canary pre releases"
 
 on:
   push:
@@ -29,5 +29,5 @@ jobs:
       - uses: "marvinpinto/action-automatic-releases@latest" 📦
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "latest"
+          automatic_release_tag: "canary"
           prerelease: true

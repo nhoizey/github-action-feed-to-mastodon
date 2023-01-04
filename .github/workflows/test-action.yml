@@ -20,7 +20,7 @@ jobs:
         run: npm ci
 
       - name: JSON Feed to Mastodon
-        uses: nhoizey/github-action-jsonfeed-to-mastodon@latest
+        uses: nhoizey/github-action-jsonfeed-to-mastodon@canary
         with:
           RUNNER_TEMPORARY_DIRECTORY: ${{ runner.temp }}
           feedUrl: "https://nicolas-hoizey.photo/feeds/mastodon/photos.json"
