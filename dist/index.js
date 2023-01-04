@@ -267,7 +267,10 @@ const processFeed = async (feedUrl) => {
       jsonCache[itemToPosse.url].toots.push(tootUrl);
       jsonCache[itemToPosse.url].lastTootTimestamp = Date.now();
 
+      core.info(cacheDirectory);
+      core.info(`Currently in ${__dirname}`);
       if (!fs.existsSync(cacheDirectory)) {
+        core.notice(`Creating ${cacheDirectory}`);
         fs.mkdirSync(cacheDirectory, { recursive: true });
       }
       fs.writeFileSync(
@@ -26949,7 +26952,7 @@ async function run() {
     }
 
     if (Date.now() < jsonTimestamp.timestamp + globalDelayToots * 60 * 1000) {
-      core.info(`Too soon…`);
+      core.warning(`Too soon…`);
       return;
     }
 
