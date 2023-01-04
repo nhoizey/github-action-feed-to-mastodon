@@ -25,7 +25,7 @@ inputs:
     default: 129600
   cacheDirectory:
     description: "Path to the directory where cache files are stored"
-    default: ".cache"
+    default: "cache"
   cacheFile:
     description: "Name of the JSON file caching data from the feed and toots"
     default: "jsonfeed-to-mastodon.json"

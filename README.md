@@ -85,7 +85,7 @@ There are 3 required **inputs**, used in the examples above, but also some optio
 | `nbTootsPerItem`     | No        | 1                                     | Number of toots that can be created from the same item                                                   |
 | `globalDelayToots`   | No        | 1440 (1 day)                          | Delay (in minutes) between any toot from this feed                                                       |
 | `delayTootsSameItem` | No        | 129600 (90 days)                      | Delay (in minutes) between any toot for the same item from this feed (used only if `nbTootsPerItem > 1`) |
-| `cacheDirectory`     | No        | `.cache`                              | Path to the directory where cache files are stored                                                       |
+| `cacheDirectory`     | No        | `cache`                               | Path to the directory where cache files are stored                                                       |
 | `cacheFile`          | No        | `jsonfeed-to-mastodon.json`           | Name of the JSON file caching data from the feed and toots                                               |
 | `cacheTimestampFile` | No        | `jsonfeed-to-mastodon-timestamp.json` | Name of the JSON file caching the timestamp of the last toot                                             |
 
@@ -106,13 +106,17 @@ There are 2 JSON files in the cache:
   - the list of URLs for these toots
 - `cacheTimestampFile` keeps track of the timestamp of the last toot create by the action
 
-Make sure to have steps "Checkout" and "Commit and push" in your action, this is how the cache files are synchronized each time the action runs.
+> **Note**
+> Make sure to have steps "Checkout" and "Commit and push" in your action, this is how the cache files are synchronized each time the action runs.
 
 The cache prevents creating the same toot multiple times if you set `nbTootsPerItem` to 1 (which is the default).
 
 If you set `nbTootsPerItem` to a value larger than 1, the action will randomly chose an item among the ones that have the least toots.
 
 In particular, any new item in the feed won't have existing toots, so it will be tooted first when the action runs, if all previous items already have at least one toot.
+
+> **Warning**
+> If you use this action in multiple actions in the same repository, make sure you set different cache files.
 
 ## License
 
