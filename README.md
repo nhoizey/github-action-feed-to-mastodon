@@ -75,7 +75,7 @@ jobs:
 
 ## Settings ("Inputs" in GitHub Action language)
 
-There are 3 required **inputs**, used in the examples above, but also some optional inputs — with default values — to fine tune the way (and when) toots are created:
+There are 3 required **inputs**, used in the examples above, but also some optional inputs — with default values — to fine tune when and how toots are created:
 
 | input                | required? | default                               | description                                                                                              |
 | -------------------- | --------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
