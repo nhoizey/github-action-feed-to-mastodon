@@ -1,0 +1,35 @@
+name: "pre-release"
+
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  pre-release:
+    name: "Pre Release"
+    runs-on: "ubuntu-latest"
+
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js ⚙️
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies 📦
+        run: npm ci
+
+      - name: Build 🏗️
+        run: npm run build
+
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          prerelease: true
+          title: "Development Build"
+          files: dist/*
