@@ -123,7 +123,7 @@ In particular, any new item in the feed won't have existing toots, so it will be
 The properties this action uses from a JSON Feed item are:
 
 - `content_text` becomes the content of the toot
-- if `attachments` is a non empty array, each image attachment is added to the toot, with its `title` used as the description
+- if `attachments` is a non empty array, each image attachment (`mime_type` starts with `image/`) is added to the toot, with its `title` used as the description
 - `lang` is used to set the language of the toot
 
 The toot visibility is currently always set to "public". (You can [help enhance this](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/8).)
