@@ -111,12 +111,22 @@ There are 2 JSON files in the cache:
 
 The cache prevents creating the same toot multiple times if you set `nbTootsPerItem` to 1 (which is the default).
 
-If you set `nbTootsPerItem` to a value larger than 1, the action will randomly chose an item among the ones that have the least toots.
+If you set `nbTootsPerItem` to a value larger than 1 (you can [help enhance this](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/7) by using `-1` to remove the limit), the action will randomly chose an item among the ones that have the least toots.
 
 In particular, any new item in the feed won't have existing toots, so it will be tooted first when the action runs, if all previous items already have at least one toot.
 
 > **Warning**
-> If you use this action in multiple actions in the same repository, make sure you set different cache files.
+> If you use this action in multiple actions in the same repository, make sure you set different cache files. (you can [help enhance this](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/9))
+
+## JSON Feed
+
+The properties this action uses from a JSON Feed item are:
+
+- `content_text` becomes the content of the toot
+- if `attachments` is a non empty array, each image attachment is added to the toot, with its `title` used as the description
+- `lang` is used to set the language of the toot
+
+The toot visibility is currently always set to "public". (You can [help enhance this](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/8)).
 
 ## License
 
