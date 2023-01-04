@@ -27470,6 +27470,7 @@ var __webpack_exports__ = {};
 (() => {
 // Native Node modules
 const { existsSync } = __nccwpck_require__(5747);
+const path = __nccwpck_require__(2049);
 
 // Third party dependencies
 const {
@@ -27489,13 +27490,14 @@ async function run() {
     // Get Action parameters
     const feedUrl = getInput("feedUrl", { required: true });
     const globalDelayToots = getInput("globalDelayToots");
+    const cacheDirectory = getInput("cacheDirectory");
     const cacheTimestampFile = getInput("cacheTimestampFile");
 
     // Get values from existing caches
     let jsonTimestamp = { timestamp: 0 };
-    if (existsSync(cacheTimestampFile)) {
-      jsonTimestamp = require(cacheTimestampFile);
-      info(`Previous attempt: ${jsonTimestamp.timestamp}`);
+    if (existsSync(path.join(cacheDirectory, cacheTimestampFile))) {
+      jsonTimestamp = require(path.join(cacheDirectory, cacheTimestampFile));
+      info(`Previous attempt timestamp: ${jsonTimestamp.timestamp}`);
     } else {
       warning("No cache found.");
     }
