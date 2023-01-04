@@ -23,10 +23,17 @@ async function run() {
     const cacheDirectory = getInput("cacheDirectory");
     const cacheTimestampFile = getInput("cacheTimestampFile");
 
+    // Compute full paths
+    const cacheDirectoryFullPath = path.join(process.cwd(), cacheDirectory);
+    const cacheTimestampFileFullPath = path.join(
+      cacheDirectoryFullPath,
+      cacheTimestampFile
+    );
+
     // Get values from existing caches
     let jsonTimestamp = { timestamp: 0 };
-    if (existsSync(path.join(cacheDirectory, cacheTimestampFile))) {
-      jsonTimestamp = require(path.join(cacheDirectory, cacheTimestampFile));
+    if (existsSync(cacheTimestampFileFullPath)) {
+      jsonTimestamp = require(cacheTimestampFileFullPath);
       info(`Previous attempt timestamp: ${jsonTimestamp.timestamp}`);
     } else {
       warning("No cache found.");

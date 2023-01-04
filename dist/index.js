@@ -197,10 +197,18 @@ const processFeed = async (feedUrl) => {
   const cacheFile = getInput("cacheFile");
   const cacheTimestampFile = getInput("cacheTimestampFile");
 
+  // Compute full paths
+  const cacheDirectoryFullPath = path.join(process.cwd(), cacheDirectory);
+  const cacheFileFullPath = path.join(cacheDirectoryFullPath, cacheFile);
+  const cacheTimestampFileFullPath = path.join(
+    cacheDirectoryFullPath,
+    cacheTimestampFile
+  );
+
   // Get values from existing cache
   let jsonCache = {};
-  if (existsSync(path.join(cacheDirectory, cacheFile))) {
-    jsonCache = require(path.join(cacheDirectory, cacheFile));
+  if (existsSync(cacheFileFullPath)) {
+    jsonCache = require(cacheFileFullPath);
   }
 
   info(`Fetching ${feedUrl} …`);
@@ -267,20 +275,16 @@ const processFeed = async (feedUrl) => {
       jsonCache[itemToPosse.url].toots.push(tootUrl);
       jsonCache[itemToPosse.url].lastTootTimestamp = Date.now();
 
-      if (!existsSync(cacheDirectory)) {
-        info(`Creating cache directory "${cacheDirectory}"`);
-        await mkdirP(cacheDirectory, { recursive: true });
+      if (!existsSync(cacheDirectoryFullPath)) {
+        info(`Creating cache directory "${cacheDirectoryFullPath}"`);
+        await mkdirP(cacheDirectoryFullPath, { recursive: true });
       }
       info("Saving cache files");
+      writeFileSync(cacheFileFullPath, JSON.stringify(jsonCache, null, 2), {
+        encoding: "utf8",
+      });
       writeFileSync(
-        path.join(cacheDirectory, cacheFile),
-        JSON.stringify(jsonCache, null, 2),
-        {
-          encoding: "utf8",
-        }
-      );
-      writeFileSync(
-        path.join(cacheDirectory, cacheTimestampFile),
+        cacheTimestampFileFullPath,
         JSON.stringify({ timestamp: Date.now() }, null, 2),
         {
           encoding: "utf8",
@@ -27493,10 +27497,17 @@ async function run() {
     const cacheDirectory = getInput("cacheDirectory");
     const cacheTimestampFile = getInput("cacheTimestampFile");
 
+    // Compute full paths
+    const cacheDirectoryFullPath = path.join(process.cwd(), cacheDirectory);
+    const cacheTimestampFileFullPath = path.join(
+      cacheDirectoryFullPath,
+      cacheTimestampFile
+    );
+
     // Get values from existing caches
     let jsonTimestamp = { timestamp: 0 };
-    if (existsSync(path.join(cacheDirectory, cacheTimestampFile))) {
-      jsonTimestamp = require(path.join(cacheDirectory, cacheTimestampFile));
+    if (existsSync(cacheTimestampFileFullPath)) {
+      jsonTimestamp = require(cacheTimestampFileFullPath);
       info(`Previous attempt timestamp: ${jsonTimestamp.timestamp}`);
     } else {
       warning("No cache found.");
