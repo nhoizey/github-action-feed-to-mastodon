@@ -1,3 +1,6 @@
+// Native Node modules
+const fs = require("fs");
+
 // Third party dependencies
 const core = require("@actions/core");
 
@@ -28,7 +31,10 @@ async function run() {
     // }
 
     // Get values from existing caches
-    const jsonTimestamp = require(cacheTimestampFile);
+    let jsonTimestamp = { timestamp: 0 };
+    if (fs.existsSync(cacheTimestampFile)) {
+      jsonTimestamp = require(cacheTimestampFile);
+    }
 
     if (Date.now() < jsonTimestamp.timestamp + globalDelayToots * 60 * 1000) {
       core.info(`Too soon…`);

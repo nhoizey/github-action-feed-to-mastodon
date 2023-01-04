@@ -194,9 +194,11 @@ const processFeed = async (feedUrl) => {
   const cacheFile = core.getInput("cacheFile");
   const cacheTimestampFile = core.getInput("cacheTimestampFile");
 
-  // Get values from existing caches
-  const jsonCache = require(cacheFile);
-  const jsonTimestamp = require(cacheTimestampFile);
+  // Get values from existing cache
+  let jsonCache = {};
+  if (fs.existsSync(cacheFile)) {
+    jsonCache = require(cacheFile);
+  }
 
   core.info(`Fetching ${feedUrl} …`);
   const feedContent = await fetch(feedUrl).then((response) => response.json());
@@ -261,14 +263,13 @@ const processFeed = async (feedUrl) => {
     if (tootUrl && tootUrl.startsWith(mastodonInstance)) {
       jsonCache[itemToPosse.url].toots.push(tootUrl);
       jsonCache[itemToPosse.url].lastTootTimestamp = Date.now();
-      jsonTimestamp.timestamp = Date.now();
 
       fs.writeFileSync(cacheFile, JSON.stringify(jsonCache, null, 2), {
         encoding: "utf8",
       });
       fs.writeFileSync(
         cacheTimestampFile,
-        JSON.stringify(jsonTimestamp, null, 2),
+        JSON.stringify({ timestamp: Date.now() }, null, 2),
         {
           encoding: "utf8",
         }
@@ -21751,6 +21752,9 @@ module.exports = require("zlib");
 var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
 (() => {
+// Native Node modules
+const fs = __nccwpck_require__(5747);
+
 // Third party dependencies
 const core = __nccwpck_require__(2186);
 
@@ -21781,7 +21785,10 @@ async function run() {
     // }
 
     // Get values from existing caches
-    const jsonTimestamp = require(cacheTimestampFile);
+    let jsonTimestamp = { timestamp: 0 };
+    if (fs.existsSync(cacheTimestampFile)) {
+      jsonTimestamp = require(cacheTimestampFile);
+    }
 
     if (Date.now() < jsonTimestamp.timestamp + globalDelayToots * 60 * 1000) {
       core.info(`Too soon…`);
