@@ -33,5 +33,43 @@ outputs:
   tootUrl: # output will be available to future steps
     description: "URL to the latest toot created"
 runs:
-  using: "node16"
-  main: "dist/index.js"
+  using: "composite"
+  steps:
+    - name: Checkout 🛎️
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js ⚙️
+      uses: actions/setup-node@v3
+      with:
+        node-version-file: ".nvmrc"
+        cache: "npm"
+
+    - name: Install dependencies 📦
+      run: npm ci
+      shell: bash
+
+    - name: JSON Feed to Mastodon 🦣
+      env:
+        RUNNER_TEMPORARY_DIRECTORY: ${{ runner.temp }}
+      run: node ./dist/index.js
+      shell: bash
+      with:
+        feedUrl: ${{ inputs.feedUrl }}
+        mastodonInstance: ${{ inputs.mastodonInstance }}
+        mastodonToken: ${{ inputs.mastodonToken }}
+        nbTootsPerItem: ${{ inputs.nbTootsPerItem }}
+        globalDelayToots: ${{ inputs.globalDelayToots }}
+        delayTootsSameItem: ${{ inputs.delayTootsSameItem }}
+        cacheFile: ${{ inputs.cacheFile }}
+        cacheTimestampFile: ${{ inputs.cacheTimestampFile }}
+
+    - name: Pull any changes 📥
+      run: git pull
+      shell: bash
+
+    - name: Commit and push 📤
+      uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: "chore(cache): update Mastodon cache file (automated)"
+        file_pattern: "*.json"
+        skip_fetch: false

@@ -1,4 +1,4 @@
-name: Test "JSON Feed to Mastodon"
+name: Test action "JSON Feed to Mastodon"
 on:
   workflow_dispatch:
 
@@ -7,7 +7,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js ⚙️
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies 📦
+        run: npm ci
+
       - name: JSON Feed to Mastodon
         uses: nhoizey/github-action-jsonfeed-to-mastodon@v1
         with:
+          RUNNER_TEMPORARY_DIRECTORY: ${{ runner.temp }}
           feedUrl: "https://nicolas-hoizey.photo/feeds/mastodon/photos.json"
+
+      - name: Pull any changes 📥
+        run: git pull
+
+      - name: Commit and push 📤
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "chore(cache): update Mastodon cache file (automated)"
+          file_pattern: "cache/*.json"
+          skip_fetch: false
