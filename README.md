@@ -126,9 +126,9 @@ In particular, any new item in the feed won't have existing toots, so it will be
 The properties this action uses from a JSON Feed item are:
 
 - `url` is used as the item id in the cache file
-- `content_text` becomes the content of the toot
+- `content_text` is used as the content of the toot
+- `language` is used to set the language of the toot
 - if `attachments` is a non empty array, each image attachment (`mime_type` starts with `image/`) is added to the toot, with its `title` used as the description
-- `lang` is used to set the language of the toot
 
 Here's an example JSON feed with one single item, with only the properties that are either required by the [JSON Feed 1.1 specification](https://www.jsonfeed.org/version/1.1/), or useful for this action:
 
