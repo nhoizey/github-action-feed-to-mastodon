@@ -1,6 +1,6 @@
 # GitHub Action: JSON Feed to Mastoson
 
-A GitHub Action that creates messages (toots) on your Mastodon account from JSON Feed items.
+A GitHub Action that creates messages (toots) on your Mastodon account from [JSON Feed](https://www.jsonfeed.org/) items.
 
 This should be a simple way to POSSE — [Publish (on your) Own Site, Syndicate Elsewhere](https://indieweb.org/POSSE) — content from your blog to your Mastodon account.
 
@@ -89,6 +89,9 @@ There are 3 required **inputs**, used in the examples above, but also some optio
 | `cacheFile`          | No        | `jsonfeed-to-mastodon.json`           | Name of the JSON file caching data from the feed and toots                                               |
 | `cacheTimestampFile` | No        | `jsonfeed-to-mastodon-timestamp.json` | Name of the JSON file caching the timestamp of the last toot                                             |
 
+> **Note**
+> The toot visibility is currently always set to "public". (You can [help enhance this](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/8).)
+
 ## Outputs
 
 The action sets an [**output** that you can use in following steps of your own action](https://docs.github.com/en/actions/creating-actions/metadata-syntax-for-github-actions#outputs-for-docker-container-and-javascript-actions):
@@ -122,11 +125,34 @@ In particular, any new item in the feed won't have existing toots, so it will be
 
 The properties this action uses from a JSON Feed item are:
 
+- `url` is used as the item id in the cache file
 - `content_text` becomes the content of the toot
 - if `attachments` is a non empty array, each image attachment (`mime_type` starts with `image/`) is added to the toot, with its `title` used as the description
 - `lang` is used to set the language of the toot
 
-The toot visibility is currently always set to "public". (You can [help enhance this](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/8).)
+Here's an example JSON feed with one single item, with only the properties that are either required by the [JSON Feed 1.1 specification](https://www.jsonfeed.org/version/1.1/), or useful for this action:
+
+```json
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "Photos - Nicolas Hoizey",
+  "items": [
+    {
+      "id": "https://nicolas-hoizey.photo/galleries/travels/europe/the-netherlands/arnhem/the-blacksmith/",
+      "url": "https://nicolas-hoizey.photo/galleries/travels/europe/the-netherlands/arnhem/the-blacksmith/",
+      "language": "en",
+      "content_text": "“The Blacksmith”\n\nShot in the amazing Openluchtmuseum (Open Air Museum) near Arnhem, in The Netherlands.\n\n📅 12th July 2014\n\n📸 Sony RX100 Mark III\n🎞️ ISO 3200, ƒ/2.8, 1/80s\n\n#Travels #Europe #TheNetherlands #Arnhem #Photo #Photography #PhotoOfTheDay #DailyPhoto\n\n🔎 https://nicolas-hoizey.photo/galleries/travels/europe/the-netherlands/arnhem/the-blacksmith/",
+      "attachments": [
+        {
+          "url": "https://nicolas-hoizey.photo/photos/the-blacksmith/small.jpg",
+          "mime_type": "image/jpeg",
+          "title": "A blacksmith in his workshop, working with his anvil"
+        }
+      ]
+    }
+  ]
+}
+```
 
 ## License
 
