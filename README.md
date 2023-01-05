@@ -38,7 +38,7 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v4
 ```
 
-You can then enhance your action with [the `schedule` even](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule), for example to automate creation of a toot every Monday at 8am (Crontab Guru: <https://crontab.guru/#0_8_*_*_1>).
+You can then enhance your action with [the `schedule` event](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule), for example to automate creation of a toot every Monday at 8am (Crontab Guru: <https://crontab.guru/#0_8_*_*_1>).
 
 Replace:
 
