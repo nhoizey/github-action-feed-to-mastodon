@@ -6,7 +6,7 @@ This should be a simple way to POSSE — [Publish (on your) Own Site, Syndicate
 
 ## Example usage
 
-I recommend to try first with an action requiring a manual action, to test the settings.
+I recommend to try first with an action requiring a manual action with [the `workflow_dispatch` event](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#workflow_dispatch), to test the settings.
 
 Here's a minimal version, with only required inputs:
 
@@ -38,39 +38,21 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v4
 ```
 
-You can then enhance your action with a schedule as defined in GitHub's [events that trigger workflows](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule), for example to automate creation of a toot every Monday at 8am:
+You can then enhance your action with [the `schedule` even](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule), for example to automate creation of a toot every Monday at 8am (Crontab Guru: <https://crontab.guru/#0_8_*_*_1>).
+
+Replace:
 
 ```yaml
-name: Create toots from JSON Feed items
+on:
+  workflow_dispatch:
+```
+
+With:
+
+```yaml
 on:
   schedule:
-    # Run the action every Monday at 8am
-    # See https://crontab.guru/#0_8_*_*_1
     - cron: "0 8 * * 1"
-  workflow_dispatch:
-
-jobs:
-  JSONFeed2Mastodon:
-    runs-on: ubuntu-latest
-
-    steps:
-      # Checkout the repository to restore previous cache
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      # Look for new toots to create from items in the JSON feed
-      - name: JSON Feed to Mastodon
-        id: createToot
-        uses: nhoizey/github-action-jsonfeed-to-mastodon@v1
-        with:
-          feedUrl: "https://example.com/feed.json"
-          mastodonInstance: "https://mastodon.social"
-          mastodonToken: ${{ secrets.MASTODON_TOKEN }}
-
-      # Push changes in the cache files to the repository
-      # See https://github.com/stefanzweifel/git-auto-commit-action#readme
-      - name: Commit and push
-        uses: stefanzweifel/git-auto-commit-action@v4
 ```
 
 ## Settings ("Inputs" in GitHub Action language)
