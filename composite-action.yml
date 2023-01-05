@@ -1,4 +1,4 @@
-name: "JSON Feed to Mastodon"
+name: "Composite JSON Feed to Mastodon"
 description: "Create messages (toots) on Mastodon from a JSON Feed items"
 author: "Nicolas Hoizey"
 branding:
