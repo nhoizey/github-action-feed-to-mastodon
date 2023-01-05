@@ -21,6 +21,7 @@ jobs:
       - name: Build 🏗️
         run: npm run build
 
-      - uses: JasonEtco/build-and-tag-action@v2 🐓
+      - name: Publish JavaScript GitHub Action 🐓
+        uses: JasonEtco/build-and-tag-action@v2
         env:
           GITHUB_TOKEN: ${{ github.token }}
