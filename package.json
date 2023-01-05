@@ -2,7 +2,7 @@
   "name": "jsonfeed-to-mastodon",
   "version": "1.0.0",
   "description": "Create messages (toots) on Mastodon from a JSON Feed items",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "lint": "eslint .",
     "build": "ncc build index.js -o dist --source-map --license licenses.txt",
