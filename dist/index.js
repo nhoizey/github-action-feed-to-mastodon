@@ -53,7 +53,7 @@ const createToot = async (tootData) => {
     let toot = {
       status: tootData.content_text,
       visibility: "public",
-      language: tootData.lang,
+      language: tootData.language,
     };
 
     // Check if there's at least one image attachment
