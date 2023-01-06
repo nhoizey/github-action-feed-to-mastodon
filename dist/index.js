@@ -11,7 +11,7 @@ const { tmpdir } = __nccwpck_require__(2087);
 const { randomUUID } = __nccwpck_require__(6417);
 
 // Third party dependencies
-const { notice, warning, getInput, getBooleanInput } = __nccwpck_require__(2186);
+const { warning, getInput, getBooleanInput } = __nccwpck_require__(2186);
 const { login } = __nccwpck_require__(880);
 
 // Local dependencies
@@ -28,25 +28,6 @@ const createToot = async (tootData) => {
   if (testMode) {
     warning("Running in test mode");
   }
-
-  // Helper Function to return unknown errors
-  const handleError = (error) => {
-    const code = Array.isArray(error) ? error[0].code : error.code;
-    const msg = Array.isArray(error) ? error[0].message : error.message;
-    process.exitCode = 1;
-    // TODO: no need to return?
-    return status(code, String(msg));
-  };
-
-  // Helper Function to return function status
-  const status = (code, msg) => {
-    notice(`[${code}] ${msg}`);
-    // TODO: no need to return
-    return {
-      statusCode: code,
-      body: msg,
-    };
-  };
 
   try {
     // Connect to Mastodon
@@ -81,7 +62,7 @@ const createToot = async (tootData) => {
               // Download the image file
               await download(attachment.url, imageFile);
             } catch (e) {
-              handleError(e.message);
+              throw new Error(e.message);
             }
 
             let media;
@@ -96,7 +77,7 @@ const createToot = async (tootData) => {
               });
               return media.id;
             } catch (error) {
-              handleError(error);
+              throw new Error(error);
             }
           })
         );
@@ -109,7 +90,7 @@ const createToot = async (tootData) => {
 
     return tootResult && tootResult.uri;
   } catch (error) {
-    return handleError(error);
+    throw new Error(error);
   }
 };
 
