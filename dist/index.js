@@ -195,12 +195,12 @@ const processFeed = async (feedUrl) => {
 
   // Get values from existing cache
   let jsonCache = {};
-  let ignoreItems = false;
+  let firstRunWithIgnoredItems = false;
   if (existsSync(cacheFileFullPath)) {
     jsonCache = require(cacheFileFullPath);
   } else {
     if (ignoreFirstRun) {
-      ignoreItems = true;
+      firstRunWithIgnoredItems = true;
     }
   }
 
@@ -225,7 +225,7 @@ const processFeed = async (feedUrl) => {
       // This is a new item
       jsonCache[item.url] = item;
       jsonCache[item.url].toots = [];
-      if (ignoreItems) {
+      if (firstRunWithIgnoredItems) {
         jsonCache[item.url].toots.push(
           "Ignored during first run (see `ignoreFirstRun` input)"
         );
@@ -269,7 +269,10 @@ const processFeed = async (feedUrl) => {
     info(`Creating toot for item "${itemToPosse.title}"`);
     const tootUrl = await createToot(itemToPosse);
     // TODO: better test?
-    if (tootUrl && tootUrl.startsWith(mastodonInstance)) {
+    if (
+      firstRunWithIgnoredItems ||
+      (tootUrl && tootUrl.startsWith(mastodonInstance))
+    ) {
       jsonCache[itemToPosse.url].toots.push(tootUrl);
       jsonCache[itemToPosse.url].lastTootTimestamp = Date.now();
 
