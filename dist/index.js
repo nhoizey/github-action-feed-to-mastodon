@@ -61,8 +61,10 @@ const createToot = async (tootData) => {
             try {
               // Download the image file
               await download(attachment.url, imageFile);
-            } catch (e) {
-              throw new Error(e.message);
+            } catch (error) {
+              throw new Error(
+                `Error while trying to download ${attachment.url}: ${error.message}`
+              );
             }
 
             let media;
@@ -77,7 +79,9 @@ const createToot = async (tootData) => {
               });
               return media.id;
             } catch (error) {
-              throw new Error(error);
+              throw new Error(
+                `Error while trying to upload attachment ${attachment.url} to Mastodon: ${error.message}`
+              );
             }
           })
         );
