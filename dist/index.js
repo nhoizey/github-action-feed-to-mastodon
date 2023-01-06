@@ -11,7 +11,7 @@ const { tmpdir } = __nccwpck_require__(2087);
 const { randomUUID } = __nccwpck_require__(6417);
 
 // Third party dependencies
-const { notice, getInput } = __nccwpck_require__(2186);
+const { notice, warning, getInput, getBooleanInput } = __nccwpck_require__(2186);
 const { login } = __nccwpck_require__(880);
 
 // Local dependencies
@@ -23,6 +23,11 @@ const createToot = async (tootData) => {
     required: true,
   });
   const mastodonToken = getInput("mastodonToken", { required: true });
+  const testMode = getBooleanInput("mastodonToken");
+
+  if (testMode) {
+    warning("Running in test mode");
+  }
 
   // Helper Function to return unknown errors
   const handleError = (error) => {
@@ -50,8 +55,11 @@ const createToot = async (tootData) => {
       accessToken: mastodonToken,
     });
 
+    // Create toot object, with safeguard for tests
     let toot = {
-      status: tootData.content_text,
+      status: testMode
+        ? tootData.content_text.replaceAll("@", "$")
+        : tootData.content_text,
       visibility: "public",
       language: tootData.language,
     };

@@ -6,7 +6,7 @@ This should be a simple way to POSSE — [Publish (on your) Own Site, Syndicate
 
 ## Example usage
 
-I recommend to try first with an action requiring a manual action with [the `workflow_dispatch` event](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#workflow_dispatch), to test the settings.
+I recommend to try first with an action requiring a manual action with [the `workflow_dispatch` event](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#workflow_dispatch), and set `testMode: true`, to test the settings.
 
 Here's a minimal version, with only required inputs:
 
@@ -31,6 +31,7 @@ jobs:
           feedUrl: "https://example.com/feed.json"
           mastodonInstance: "https://mastodon.social"
           mastodonToken: ${{ secrets.MASTODON_TOKEN }}
+          testMode: true
 
       # Push changes in the cache files to the repository
       # See https://github.com/stefanzweifel/git-auto-commit-action#readme
@@ -55,21 +56,24 @@ on:
     - cron: "0 8 * * 1"
 ```
 
+When everything works perfectly, you can remove the `testMode` input, or set it to `false`.
+
 ## Settings ("Inputs" in GitHub Action language)
 
 There are 3 required **inputs**, used in the examples above, but also some optional inputs — with default values — to fine tune when and how toots are created:
 
-| input                | required? | default                               | description                                                                                              |
-| -------------------- | --------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `feedUrl`            | **Yes**   |                                       | URL of the JSON Feed to fetch                                                                            |
-| `mastodonInstance`   | **Yes**   |                                       | The root URL of the Mastodon instance where the toot should be created                                   |
-| `mastodonToken`      | **Yes**   |                                       | Your access token for the Mastodon API, get it from `/settings/applications/new` on your instance        |
-| `nbTootsPerItem`     | No        | 1                                     | Number of toots that can be created from the same item                                                   |
-| `globalDelayToots`   | No        | 1440 (1 day)                          | Delay (in minutes) between any toot from this feed                                                       |
-| `delayTootsSameItem` | No        | 129600 (90 days)                      | Delay (in minutes) between any toot for the same item from this feed (used only if `nbTootsPerItem > 1`) |
-| `cacheDirectory`     | No        | `cache`                               | Path to the directory where cache files are stored                                                       |
-| `cacheFile`          | No        | `jsonfeed-to-mastodon.json`           | Name of the JSON file caching data from the feed and toots                                               |
-| `cacheTimestampFile` | No        | `jsonfeed-to-mastodon-timestamp.json` | Name of the JSON file caching the timestamp of the last toot                                             |
+| input                | required? |                               default | description                                                                                              |
+| -------------------- | :-------: | ------------------------------------: | -------------------------------------------------------------------------------------------------------- |
+| `feedUrl`            |  **Yes**  |                                       | URL of the JSON Feed to fetch                                                                            |
+| `mastodonInstance`   |  **Yes**  |                                       | The root URL of the Mastodon instance where the toot should be created                                   |
+| `mastodonToken`      |  **Yes**  |                                       | Your access token for the Mastodon API, get it from `/settings/applications/new` on your instance        |
+| `nbTootsPerItem`     |    No     |                                     1 | Number of toots that can be created from the same item                                                   |
+| `globalDelayToots`   |    No     |                          1440 (1 day) | Delay (in minutes) between any toot from this feed                                                       |
+| `delayTootsSameItem` |    No     |                      129600 (90 days) | Delay (in minutes) between any toot for the same item from this feed (used only if `nbTootsPerItem > 1`) |
+| `cacheDirectory`     |    No     |                               `cache` | Path to the directory where cache files are stored                                                       |
+| `cacheFile`          |    No     |           `jsonfeed-to-mastodon.json` | Name of the JSON file caching data from the feed and toots                                               |
+| `cacheTimestampFile` |    No     | `jsonfeed-to-mastodon-timestamp.json` | Name of the JSON file caching the timestamp of the last toot                                             |
+| `testMode`           |    No     |                                 false | Activates a mode for tests, where mentions are removed (`@` replaced by `$`)                             |
 
 > **Note**
 > The toot visibility is currently always set to "public". (You can [help enhance this](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/8).)
