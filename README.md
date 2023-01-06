@@ -33,6 +33,10 @@ jobs:
           mastodonToken: ${{ secrets.MASTODON_TOKEN }}
           testMode: true
 
+      # Make sure files are up to date if other commits have been pushed in the mean time
+      - name: Pull any changes from Git
+        run: git pull
+
       # Push changes in the cache files to the repository
       # See https://github.com/stefanzweifel/git-auto-commit-action#readme
       - name: Commit and push
