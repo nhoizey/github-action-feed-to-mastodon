@@ -23,7 +23,7 @@ const createToot = async (tootData) => {
     required: true,
   });
   const mastodonToken = getInput("mastodonToken", { required: true });
-  const testMode = getBooleanInput("mastodonToken");
+  const testMode = getBooleanInput("testMode");
 
   if (testMode) {
     warning("Running in test mode");
