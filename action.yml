@@ -32,11 +32,14 @@ inputs:
   cacheTimestampFile:
     description: "Name of the JSON file caching the timestamp of the last toot"
     default: "jsonfeed-to-mastodon-timestamp.json"
+  ignoreFirstRun:
+    description: "Items collected when the feed is fetched the first time won't be used as toots. This aims to prevent flooding Mastodon, as these items may have already been shared another way, manual or automated."
+    default: true
   testMode:
     description: "Activate a mode for tests, where mentions are removed (`@` replaced by `$`)"
     default: false
 outputs:
-  tootUrl: # output will be available to future steps
+  tootUrl: # output will be available to next steps
     description: "URL to the latest toot created"
 runs:
   using: "node16"

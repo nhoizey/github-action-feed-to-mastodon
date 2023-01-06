@@ -166,7 +166,7 @@ const { existsSync, writeFileSync } = __nccwpck_require__(5747);
 const path = __nccwpck_require__(2049);
 
 // Third party dependencies
-const { getInput, info } = __nccwpck_require__(2186);
+const { getInput, getBooleanInput, info } = __nccwpck_require__(2186);
 const { mkdirP } = __nccwpck_require__(7436);
 const fetch = __nccwpck_require__(467);
 
@@ -183,6 +183,7 @@ const processFeed = async (feedUrl) => {
   const cacheDirectory = getInput("cacheDirectory");
   const cacheFile = getInput("cacheFile");
   const cacheTimestampFile = getInput("cacheTimestampFile");
+  const ignoreFirstRun = getBooleanInput("ignoreFirstRun");
 
   // Compute full paths
   const cacheDirectoryFullPath = path.join(process.cwd(), cacheDirectory);
@@ -194,8 +195,13 @@ const processFeed = async (feedUrl) => {
 
   // Get values from existing cache
   let jsonCache = {};
+  let ignoreItems = false;
   if (existsSync(cacheFileFullPath)) {
     jsonCache = require(cacheFileFullPath);
+  } else {
+    if (ignoreFirstRun) {
+      ignoreItems = true;
+    }
   }
 
   info(`Fetching ${feedUrl} …`);
@@ -207,7 +213,6 @@ const processFeed = async (feedUrl) => {
   // Iterate over feed items
   items.forEach((item) => {
     // Fill cache with new items
-    // TODO: remove items from cache that are not anymore in the feed
     if (Object.prototype.hasOwnProperty.call(jsonCache, item.url)) {
       const existingToots = [...jsonCache[item.url].toots];
       let lastTootTimestamp = jsonCache[item.url].lastTootTimestamp;
@@ -220,6 +225,12 @@ const processFeed = async (feedUrl) => {
       // This is a new item
       jsonCache[item.url] = item;
       jsonCache[item.url].toots = [];
+      if (ignoreItems) {
+        jsonCache[item.url].toots.push(
+          "Ignored during first run (see `ignoreFirstRun` input)"
+        );
+        jsonCache[item.url].lastTootTimestamp = Date.now();
+      }
     }
     // Fill candidates for toot
     if (

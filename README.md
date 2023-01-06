@@ -62,18 +62,19 @@ When everything works perfectly, you can remove the `testMode` input, or set it 
 
 There are 3 required **inputs**, used in the examples above, but also some optional inputs — with default values — to fine tune when and how toots are created:
 
-| input                | required? |                               default | description                                                                                              |
-| -------------------- | :-------: | ------------------------------------: | -------------------------------------------------------------------------------------------------------- |
-| `feedUrl`            |  **Yes**  |                                       | URL of the JSON Feed to fetch                                                                            |
-| `mastodonInstance`   |  **Yes**  |                                       | The root URL of the Mastodon instance where the toot should be created                                   |
-| `mastodonToken`      |  **Yes**  |                                       | Your access token for the Mastodon API, get it from `/settings/applications/new` on your instance        |
-| `nbTootsPerItem`     |    No     |                                     1 | Number of toots that can be created from the same item                                                   |
-| `globalDelayToots`   |    No     |                          1440 (1 day) | Delay (in minutes) between any toot from this feed                                                       |
-| `delayTootsSameItem` |    No     |                      129600 (90 days) | Delay (in minutes) between any toot for the same item from this feed (used only if `nbTootsPerItem > 1`) |
-| `cacheDirectory`     |    No     |                               `cache` | Path to the directory where cache files are stored                                                       |
-| `cacheFile`          |    No     |           `jsonfeed-to-mastodon.json` | Name of the JSON file caching data from the feed and toots                                               |
-| `cacheTimestampFile` |    No     | `jsonfeed-to-mastodon-timestamp.json` | Name of the JSON file caching the timestamp of the last toot                                             |
-| `testMode`           |    No     |                                 false | Activates a mode for tests, where mentions are removed (`@` replaced by `$`)                             |
+| input                | required? |                               default | description                                                                                                                                                                                                                                                                      |
+| -------------------- | :-------: | ------------------------------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `feedUrl`            |  **Yes**  |                                       | URL of the JSON Feed to fetch                                                                                                                                                                                                                                                    |
+| `mastodonInstance`   |  **Yes**  |                                       | The root URL of the Mastodon instance where the toot should be created                                                                                                                                                                                                           |
+| `mastodonToken`      |  **Yes**  |                                       | Your access token for the Mastodon API, get it from `/settings/applications/new` on your instance                                                                                                                                                                                |
+| `nbTootsPerItem`     |    No     |                                     1 | Number of toots that can be created from the same item                                                                                                                                                                                                                           |
+| `globalDelayToots`   |    No     |                          1440 (1 day) | Delay (in minutes) between any toot from this feed                                                                                                                                                                                                                               |
+| `delayTootsSameItem` |    No     |                      129600 (90 days) | Delay (in minutes) between any toot for the same item from this feed (used only if `nbTootsPerItem > 1`)                                                                                                                                                                         |
+| `cacheDirectory`     |    No     |                               `cache` | Path to the directory where cache files are stored                                                                                                                                                                                                                               |
+| `cacheFile`          |    No     |           `jsonfeed-to-mastodon.json` | Name of the JSON file caching data from the feed and toots                                                                                                                                                                                                                       |
+| `cacheTimestampFile` |    No     | `jsonfeed-to-mastodon-timestamp.json` | Name of the JSON file caching the timestamp of the last toot                                                                                                                                                                                                                     |
+| `ignoreFirstRun`     |    No     |                                  true | Items collected when the feed is fetched the first time won't be used as toots. This aims to prevent flooding Mastodon, as these items may have already been shared another way, manual or automated. If `nbTootsPerItem` is set to more than 1, only the first toot is ignored. |
+| `testMode`           |    No     |                                 false | Activates a mode for tests, where mentions are removed (`@` replaced by `$`)                                                                                                                                                                                                     |
 
 > **Note**
 > The toot visibility is currently always set to "public". (You can [help enhance this](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/8).)
@@ -113,6 +114,7 @@ The properties this action uses from a JSON Feed item are:
 
 - `url` is used as the item id in the cache file
 - `content_text` is used as the content of the toot
+- `date_published` ([RFC 3339 format](https://www.rfc-editor.org/rfc/rfc3339)) will be used when [issue #14](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/14) will be fixed (you can help)
 - `language` is used to set the language of the toot
 - if `attachments` is a non empty array, each image attachment (`mime_type` starts with `image/`) is added to the toot, with its `title` used as the description
 
@@ -127,6 +129,7 @@ Here's an example JSON feed with one single item, with only the properties that 
       "id": "https://nicolas-hoizey.photo/galleries/travels/europe/the-netherlands/arnhem/the-blacksmith/",
       "url": "https://nicolas-hoizey.photo/galleries/travels/europe/the-netherlands/arnhem/the-blacksmith/",
       "language": "en",
+      "date_published": "2014-07-12T13:07:00Z",
       "content_text": "“The Blacksmith”\n\nShot in the amazing Openluchtmuseum (Open Air Museum) near Arnhem, in The Netherlands.\n\n📅 12th July 2014\n\n📸 Sony RX100 Mark III\n🎞️ ISO 3200, ƒ/2.8, 1/80s\n\n#Travels #Europe #TheNetherlands #Arnhem #Photo #Photography #PhotoOfTheDay #DailyPhoto\n\n🔎 https://nicolas-hoizey.photo/galleries/travels/europe/the-netherlands/arnhem/the-blacksmith/",
       "attachments": [
         {
