@@ -105,12 +105,21 @@ There are 2 JSON files in the cache:
 
 The cache prevents creating the same toot multiple times if you set `nbTootsPerItem` to 1 (which is the default).
 
-If you set `nbTootsPerItem` to a value larger than 1 (you can [help enhance this](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/7) by using `-1` to remove the limit), the action will randomly chose an item among the ones that have the least toots (you can [help add other strategies](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/14)).
+If you set `nbTootsPerItem` to a value larger than 1, the action will randomly chose an item among the ones that have the least toots.
+
+> **Note**
+> Once [issue #7](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/7) fixed, you'll be able to set `nbTootsPerItem` to `-1` to remove any limit.
+
+> **Note**
+> Once [issue #14](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/14) fixed, you'll be able to define other choice strategies.
 
 In particular, any new item in the feed won't have existing toots, so it will be tooted first when the action runs, if all previous items already have at least one toot.
 
 > **Warning**
-> If you use this action in multiple actions in the same repository, make sure you set different cache files. (you can [help enhance this](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/9).)
+> If you use this action in multiple actions in the same repository, make sure you set different cache files.
+
+> **Note**
+> Once [issue #9](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/9) fixed, the cache file default name will be based on the feed's URL.
 
 ## JSON Feed
 
@@ -118,7 +127,7 @@ The properties this action uses from a JSON Feed item are:
 
 - `url` is used as the item id in the cache file
 - `content_text` is used as the content of the toot
-- `date_published` ([RFC 3339 format](https://www.rfc-editor.org/rfc/rfc3339)) will be used when [issue #14](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/14) will be fixed (you can help)
+- `date_published` ([RFC 3339 format](https://www.rfc-editor.org/rfc/rfc3339))
 - `language` is used to set the language of the toot
 - if `attachments` is a non empty array, each image attachment (`mime_type` starts with `image/`) is added to the toot, with its `title` used as the description
 
