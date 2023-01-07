@@ -194,13 +194,16 @@ const processFeed = async (feedUrl) => {
   );
 
   // Get values from existing cache
+  let cacheToSave = false;
   let jsonCache = {};
   let firstRunWithIgnoredItems = false;
   if (existsSync(cacheFileFullPath)) {
     jsonCache = require(cacheFileFullPath);
   } else {
     if (ignoreFirstRun) {
+      info("Initializing the cache files without creating any toot");
       firstRunWithIgnoredItems = true;
+      cacheToSave = true;
     }
   }
 
@@ -269,13 +272,13 @@ const processFeed = async (feedUrl) => {
     info(`Creating toot for item "${itemToPosse.title}"`);
     const tootUrl = await createToot(itemToPosse);
     // TODO: better test?
-    if (
-      firstRunWithIgnoredItems ||
-      (tootUrl && tootUrl.startsWith(mastodonInstance))
-    ) {
+    if (tootUrl && tootUrl.startsWith(mastodonInstance)) {
       jsonCache[itemToPosse.url].toots.push(tootUrl);
       jsonCache[itemToPosse.url].lastTootTimestamp = Date.now();
+      cacheToSave = true;
+    }
 
+    if (cacheToSave) {
       if (!existsSync(cacheDirectoryFullPath)) {
         info(`Creating cache directory "${cacheDirectoryFullPath}"`);
         await mkdirP(cacheDirectoryFullPath, { recursive: true });
