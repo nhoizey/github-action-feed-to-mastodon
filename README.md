@@ -100,8 +100,8 @@ There are 2 JSON files in the cache:
   - the list of URLs for these toots
 - `cacheTimestampFile` keeps track of the timestamp of the last toot create by the action
 
-> **Note**
-> Make sure to have steps "Checkout" and "Commit and push" in your action, this is how the cache files are synchronized each time the action runs.
+> **Warning**
+> Make sure to have steps "Checkout", "Pull" and "Commit and push" in your action, this is how the cache files are synchronized each time the action runs.
 
 The cache prevents creating the same toot multiple times if you set `nbTootsPerItem` to 1 (which is the default).
 
