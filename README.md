@@ -105,7 +105,7 @@ There are 2 JSON files in the cache:
 
 The cache prevents creating the same toot multiple times if you set `nbTootsPerItem` to 1 (which is the default).
 
-If you set `nbTootsPerItem` to a value larger than 1 (you can [help enhance this](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/7) by using `-1` to remove the limit), the action will randomly chose an item among the ones that have the least toots.
+If you set `nbTootsPerItem` to a value larger than 1 (you can [help enhance this](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/7) by using `-1` to remove the limit), the action will randomly chose an item among the ones that have the least toots (you can [help add other strategies](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/14)).
 
 In particular, any new item in the feed won't have existing toots, so it will be tooted first when the action runs, if all previous items already have at least one toot.
 
