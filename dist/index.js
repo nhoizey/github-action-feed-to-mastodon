@@ -71,7 +71,7 @@ const createToot = async (tootData) => {
             try {
               media = await MastodonClient.mediaAttachments.create({
                 file: createReadStream(imageFile),
-                description: attachment.title,
+                description: attachment._alt_text || attachment.title || "",
               });
               // Remove the temporary local copy
               await unlink(imageFile, () => {
