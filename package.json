@@ -8,7 +8,7 @@
     "build": "ncc build index.js -o dist --source-map --license licenses.txt",
     "test": "jest",
     "all": "npm run lint && npm run build && npm run test",
-    "updateTag": "git tag -fa v1 -m \"Update v1 tag\" && git push origin v1 --force"
+    "updateTag": "git tag -fa v2 -m \"Update v2 tag\" && git push origin v2 --force"
   },
   "repository": {
     "type": "git",
