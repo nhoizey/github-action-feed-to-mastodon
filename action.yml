@@ -1,12 +1,12 @@
-name: "Feed to Mastodon"
-description: "Create messages (toots) on Mastodon from a Feed items"
+name: "Any feed to Mastodon"
+description: "Create messages (toots) on Mastodon from a RSS/Atom/JSON feed's items"
 author: "Nicolas Hoizey"
 branding:
   icon: "cast"
   color: "purple"
 inputs:
   feedUrl:
-    description: "URL of the Feed to fetch"
+    description: "URL of the feed to fetch"
     required: true
   mastodonInstance:
     description: "The root URL of the Mastodon instance where the toot should be created"
