@@ -1,12 +1,12 @@
-name: "JSON Feed to Mastodon"
-description: "Create messages (toots) on Mastodon from a JSON Feed items"
+name: "Feed to Mastodon"
+description: "Create messages (toots) on Mastodon from a Feed items"
 author: "Nicolas Hoizey"
 branding:
   icon: "cast"
   color: "purple"
 inputs:
   feedUrl:
-    description: "URL of the JSON Feed to fetch"
+    description: "URL of the Feed to fetch"
     required: true
   mastodonInstance:
     description: "The root URL of the Mastodon instance where the toot should be created"
@@ -28,10 +28,10 @@ inputs:
     default: "cache"
   cacheFile:
     description: "Name of the JSON file caching data from the feed and toots"
-    default: "jsonfeed-to-mastodon.json"
+    default: "feed-to-mastodon.json"
   cacheTimestampFile:
     description: "Name of the JSON file caching the timestamp of the last toot"
-    default: "jsonfeed-to-mastodon-timestamp.json"
+    default: "feed-to-mastodon-timestamp.json"
   ignoreFirstRun:
     description: "Items collected when the feed is fetched the first time won't be used as toots. This aims to prevent flooding Mastodon, as these items may have already been shared another way, manual or automated."
     default: true

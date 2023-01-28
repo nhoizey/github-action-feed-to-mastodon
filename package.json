@@ -1,7 +1,7 @@
 {
-  "name": "jsonfeed-to-mastodon",
-  "version": "1.0.0",
-  "description": "Create messages (toots) on Mastodon from a JSON Feed items",
+  "name": "feed-to-mastodon",
+  "version": "2.0.0",
+  "description": "Create messages (toots) on Mastodon from a RSS/Atom/JSON feed items",
   "main": "dist/index.js",
   "scripts": {
     "lint": "eslint .",
@@ -12,20 +12,23 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nhoizey/github-action-jsonfeed-to-mastodon.git"
+    "url": "git+https://github.com/nhoizey/github-action-feed-to-mastodon.git"
   },
   "keywords": [
     "GitHub",
     "Action",
     "Mastodon",
+    "feed",
+    "RSS",
+    "Atom",
     "JSON Feed"
   ],
   "author": "Nicolas Hoizey",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues"
+    "url": "https://github.com/nhoizey/github-action-feed-to-mastodon/issues"
   },
-  "homepage": "https://github.com/nhoizey/github-action-jsonfeed-to-mastodon#readme",
+  "homepage": "https://github.com/nhoizey/github-action-feed-to-mastodon#readme",
   "devDependencies": {
     "@actions/core": "^1.10.0",
     "@actions/io": "^1.1.2",
