@@ -33,7 +33,7 @@
     "@actions/core": "^1.10.0",
     "@actions/io": "^1.1.2",
     "@vercel/ncc": "^0.31.1",
-    "eslint": "^8.32.0",
+    "eslint": "^8.33.0",
     "jest": "^27.5.1",
     "masto": "^4.11.1",
     "node-fetch": "^2.6.8"
