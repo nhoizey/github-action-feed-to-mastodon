@@ -110,7 +110,7 @@ jobs:
         if: ${{ steps.vars.outputs.updatable }}
         uses: peter-evans/create-pull-request@v4
         with:
-          token: ${{ secrets.PAT }}
+          # token: ${{ secrets.PAT }}
           title: "build(deps): update NPM packages [skip ci]"
           body: |
             # Updating dependencies
