@@ -44,13 +44,13 @@ jobs:
             echo "updatable=false" >> "${GITHUB_OUTPUT}"
           else
             HEADER=$(echo "$OUTDATED" | grep "Package")
-            COMPATIBLE=$(echo "$OUTDATED" | awk '$2!=$3' | grep -v "Package")
+            COMPATIBLE=$(echo "$OUTDATED" | awk '$2!=$3' | grep -v "Package" || true)
             if [[ -z "$COMPATIBLE" ]]; then
               COMPATIBLE_COUNT=0
             else
               COMPATIBLE_COUNT=$(($(echo "$COMPATIBLE" | wc -l) + 0))
             fi
-            NOT_COMPATIBLE=$(echo "$OUTDATED" | awk '$2==$3')
+            NOT_COMPATIBLE=$(echo "$OUTDATED" | awk '$2==$3' || true)
             if [[ -z "$NOT_COMPATIBLE" ]]; then
               NOT_COMPATIBLE_COUNT=0
             else
