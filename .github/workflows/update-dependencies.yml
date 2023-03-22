@@ -34,6 +34,9 @@ jobs:
       - name: 🔍 Check for outdated packages
         id: vars
         run: |
+          set -x
+          set -e
+
           OUTDATED=$(npm outdated || true)
 
           if [[ -z "$OUTDATED" ]]; then
