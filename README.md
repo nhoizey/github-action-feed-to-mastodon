@@ -1,4 +1,4 @@
-# GitHub Action: Any feed to Mastoson
+# GitHub Action: Any feed to Mastodon
 
 A GitHub Action that creates messages (toots) on your Mastodon account from a RSS/Atom/JSON feed's items.
 
