@@ -1,5 +1,8 @@
 # GitHub Action: Any feed to Mastodon
 
+[![GitHub stars](https://img.shields.io/github/stars/nhoizey/github-action-feed-to-mastodon.svg?style=for-the-badge&logo=github)](https://github.com/nhoizey/github-action-feed-to-mastodon/stargazers)
+[![Follow @nhoizey@mamot.fr](https://img.shields.io/mastodon/follow/000262395?domain=https%3A%2F%2Fmamot.fr&style=for-the-badge&logo=mastodon&logoColor=white&color=6364FF)](https://mamot.fr/@nhoizey)
+
 A GitHub Action that creates messages (toots) on your Mastodon account from a RSS/Atom/JSON feed's items.
 
 This should be a simple way to POSSE — [Publish (on your) Own Site, Syndicate Elsewhere](https://indieweb.org/POSSE) — content from your blog to your Mastodon account.
