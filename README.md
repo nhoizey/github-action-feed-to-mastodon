@@ -87,9 +87,6 @@ There are 3 required **inputs**, used in the examples above, but also some optio
 | `testMode`           |    No     |                             false | Activates a mode for tests, where mentions are removed (`@` replaced by `$`)                                                                                                                                                                                                     |
 | `tootVisibility`     |    No     |                          `public` | Toot visibility. The following options can be used: `public` (visible for all), `unlisted` (opted-out of discovery features), `private` (followers only), `direct` (visible only for mentioned users)                                                                            |
 
-> **Note**
-> The toot visibility is currently always set to "public". (You can [help enhance this](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/8).)
-
 ## Outputs
 
 The action sets an [**output** that you can use in following steps of your own action](https://docs.github.com/en/actions/creating-actions/metadata-syntax-for-github-actions#outputs-for-docker-container-and-javascript-actions):
