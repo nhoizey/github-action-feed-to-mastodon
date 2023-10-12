@@ -38,6 +38,9 @@ inputs:
   testMode:
     description: "Activate a mode for tests, where mentions are removed (`@` replaced by `$`)"
     default: false
+  logFeedItemContent:
+    description: "Log the content of the feed item that will be used to create the toot"
+    default: false
 outputs:
   tootUrl: # output will be available to next steps
     description: "URL to the latest toot created"
