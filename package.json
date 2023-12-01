@@ -21,7 +21,8 @@
     "feed",
     "RSS",
     "Atom",
-    "JSON Feed"
+    "JSON Feed",
+    "API"
   ],
   "author": "Nicolas Hoizey",
   "license": "MIT",
