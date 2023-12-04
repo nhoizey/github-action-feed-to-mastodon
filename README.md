@@ -7,7 +7,7 @@ A GitHub Action that creates messages (toots) on your Mastodon account from a RS
 
 This should be a simple way to POSSE — [Publish (on your) Own Site, Syndicate Elsewhere](https://indieweb.org/POSSE) — content from your blog to your Mastodon account.
 
-> **Note**
+> [!NOTE]
 > It currently supports [JSON Feed](https://www.jsonfeed.org/), with [support for RSS and Atom planned](https://github.com/nhoizey/github-action-feed-to-mastodon/issues/16).
 
 ## Example usage
@@ -87,7 +87,7 @@ There are 3 required **inputs**, used in the examples above, but also some optio
 | `testMode`           |    No     |                             false | Activates a mode for tests, where mentions are removed (`@` replaced by `$`)                                                                                                                                                                                                     |
 | `logFeedItemContent` |    No     |                             false | Log the content of the feed item that will be used to create the toot                                                                                                                                                                                                            |
 
-> **Note**
+> [!NOTE]
 > The toot visibility is currently always set to "public". (You can [help enhance this](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/8).)
 
 ## Outputs
@@ -114,18 +114,18 @@ The cache prevents creating the same toot multiple times if you set `nbTootsPerI
 
 If you set `nbTootsPerItem` to a value larger than 1, the action will randomly chose an item among the ones that have the least toots.
 
-> **Note**
+> [!TIP]
 > Once [issue #7](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/7) fixed, you'll be able to set `nbTootsPerItem` to `-1` to remove any limit.
 
-> **Note**
+> [!TIP]
 > Once [issue #14](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/14) fixed, you'll be able to define other choice strategies.
 
 In particular, any new item in the feed won't have existing toots, so it will be tooted first when the action runs, if all previous items already have at least one toot.
 
-> **Warning**
+> [!CAUTION]
 > If you use this action in multiple actions in the same repository, make sure you set different cache files.
 
-> **Note**
+> [!TIP]
 > Once [issue #9](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/9) fixed, the cache file default name will be based on the feed's URL.
 
 ## Required and optional feed content
