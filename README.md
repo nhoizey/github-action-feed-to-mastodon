@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  JSONFeed2Mastodon:
+  Feed2Mastodon:
     runs-on: ubuntu-latest
 
     steps:
