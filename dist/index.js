@@ -34,6 +34,7 @@ const createToot = async (tootData) => {
     const MastodonClient = await login({
       url: mastodonInstance,
       accessToken: mastodonToken,
+      disableVersionCheck: true,
     });
 
     // Create toot object, with safeguard for tests
