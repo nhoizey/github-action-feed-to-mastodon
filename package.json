@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "lint": "eslint .",
-    "build": "ncc build index.js -o dist --source-map --license licenses.txt",
+    "build": "ncc build index.js -o dist --no-source-map-register --license licenses.txt",
     "test": "jest",
     "all": "npm run lint && npm run build && npm run test",
     "updateTag": "git tag -fa v2 -m \"Update v2 tag\" && git push origin v2 --force"
@@ -21,7 +21,8 @@
     "feed",
     "RSS",
     "Atom",
-    "JSON Feed"
+    "JSON Feed",
+    "API"
   ],
   "author": "Nicolas Hoizey",
   "license": "MIT",
@@ -30,12 +31,12 @@
   },
   "homepage": "https://github.com/nhoizey/github-action-feed-to-mastodon#readme",
   "devDependencies": {
-    "@actions/core": "^1.10.0",
+    "@actions/core": "^1.10.1",
     "@actions/io": "^1.1.3",
-    "@vercel/ncc": "^0.31.1",
-    "eslint": "^8.41.0",
+    "@vercel/ncc": "^0.38.1",
+    "eslint": "^8.56.0",
     "jest": "^27.5.1",
     "masto": "^4.11.1",
-    "node-fetch": "^2.6.11"
+    "node-fetch": "^2.7.0"
   }
 }

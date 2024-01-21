@@ -41,6 +41,9 @@ inputs:
   tootVisibility:
     description: "Visibility of published toots"
     default: "public"
+  logFeedItemContent:
+    description: "Log the content of the feed item that will be used to create the toot"
+    default: false
 outputs:
   tootUrl: # output will be available to next steps
     description: "URL to the latest toot created"
