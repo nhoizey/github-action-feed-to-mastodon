@@ -24,6 +24,7 @@ const createToot = async (tootData) => {
   });
   const mastodonToken = getInput("mastodonToken", { required: true });
   const testMode = getBooleanInput("testMode");
+  const tootVisibility = getInput("tootVisiblity");
 
   if (testMode) {
     warning("Running in test mode");
@@ -42,7 +43,7 @@ const createToot = async (tootData) => {
       status: testMode
         ? tootData.content_text.replaceAll("@", "$")
         : tootData.content_text,
-      visibility: "public",
+      visibility: tootVisibility,
       language: tootData.language,
     };
 
