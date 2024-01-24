@@ -11,7 +11,7 @@ const { tmpdir } = __nccwpck_require__(2037);
 const { randomUUID } = __nccwpck_require__(6113);
 
 // Third party dependencies
-const { warning, getInput, getBooleanInput } = __nccwpck_require__(2186);
+const { warning, info, getInput, getBooleanInput } = __nccwpck_require__(2186);
 const { login } = __nccwpck_require__(880);
 
 // Local dependencies
@@ -25,6 +25,7 @@ const createToot = async (tootData) => {
   const mastodonToken = getInput("mastodonToken", { required: true });
   const testMode = getBooleanInput("testMode");
   const tootVisibility = getInput("tootVisiblity");
+  const debugMode = getBooleanInput("debugMode");
 
   if (testMode) {
     warning("Running in test mode");
@@ -32,6 +33,9 @@ const createToot = async (tootData) => {
 
   try {
     // Connect to Mastodon without checking the version
+    if (debugMode) {
+      info(`[DEBUG] Trying to connect to ${mastodonInstance}`);
+    }
     const MastodonClient = await login({
       url: mastodonInstance,
       accessToken: mastodonToken,
@@ -47,20 +51,42 @@ const createToot = async (tootData) => {
       language: tootData.language,
     };
 
+    if (debugMode) {
+      info(`[DEBUG] Toot object:
+${JSON.stringify(toot, null, 2)}
+`);
+    }
+
     // Check if there's at least one image attachment
     if (
       Object.prototype.hasOwnProperty.call(tootData, "attachments") &&
       tootData.attachments.length > 0
     ) {
+      if (debugMode) {
+        info(`[DEBUG] tootData.attachments:
+${JSON.stringify(tootData.attachments, null, 2)}
+`);
+      }
+
       let imagesAttachments = tootData.attachments.filter((attachment) =>
         // Only keep images
         attachment.mime_type.match("image/")
       );
       if (imagesAttachments.length > 0) {
+        if (debugMode) {
+          info(`[DEBUG] imagesAttachments:
+${JSON.stringify(imagesAttachments, null, 2)}
+`);
+        }
+
         let uploadedImages = await Promise.all(
           imagesAttachments.map(async (attachment) => {
             let imageFile = path.join(tmpdir(), `image-${randomUUID()}`);
             try {
+              if (debugMode) {
+                info(`[DEBUG] Downloading ${attachment.url} to ${imageFile}`);
+              }
+
               // Download the image file
               await download(attachment.url, imageFile);
             } catch (error) {
@@ -71,6 +97,10 @@ const createToot = async (tootData) => {
 
             let media;
             try {
+              if (debugMode) {
+                info(`[DEBUG] Uploading ${imageFile} to Mastodon`);
+              }
+
               media = await MastodonClient.mediaAttachments.create({
                 file: createReadStream(imageFile),
                 description: attachment._alt_text || attachment.title || "",
@@ -88,11 +118,27 @@ const createToot = async (tootData) => {
           })
         );
 
+        if (debugMode) {
+          info(
+            `[DEBUG] uploadedImages: ${JSON.stringify(uploadedImages, null, 2)}`
+          );
+        }
+
         toot.mediaIds = uploadedImages;
       }
     }
 
-    const tootResult = await MastodonClient.statuses.create(toot);
+    let tootResult;
+    try {
+      if (debugMode) {
+        info(`[DEBUG] Creating toot on Mastodon`);
+      }
+      tootResult = await MastodonClient.statuses.create(toot);
+    } catch (error) {
+      throw new Error(
+        `Error while trying to create toot on Mastodon: ${error.message}`
+      );
+    }
 
     return tootResult && tootResult.uri;
   } catch (error) {
@@ -187,6 +233,7 @@ const processFeed = async (feedUrl) => {
   const cacheTimestampFile = getInput("cacheTimestampFile");
   const ignoreFirstRun = getBooleanInput("ignoreFirstRun");
   const logFeedItemContent = getBooleanInput("logFeedItemContent");
+  const debugMode = getBooleanInput("debugMode");
 
   // Compute full paths
   const cacheDirectoryFullPath = path.join(process.cwd(), cacheDirectory);
@@ -195,6 +242,21 @@ const processFeed = async (feedUrl) => {
     cacheDirectoryFullPath,
     cacheTimestampFile
   );
+
+  if (debugMode) {
+    info(`[DEBUG] mastodonInstance: ${mastodonInstance}`);
+    info(`[DEBUG] nbTootsPerItem: ${nbTootsPerItem}`);
+    info(`[DEBUG] delayTootsSameItem: ${delayTootsSameItem}`);
+    info(`[DEBUG] cacheDirectory: ${cacheDirectory}`);
+    info(`[DEBUG] cacheFile: ${cacheFile}`);
+    info(`[DEBUG] cacheTimestampFile: ${cacheTimestampFile}`);
+    info(`[DEBUG] ignoreFirstRun: ${ignoreFirstRun}`);
+    info(`[DEBUG] logFeedItemContent: ${logFeedItemContent}`);
+    info(`[DEBUG] debugMode: ${debugMode}`);
+    info(`[DEBUG] cacheDirectoryFullPath: ${cacheDirectoryFullPath}`);
+    info(`[DEBUG] cacheFileFullPath: ${cacheFileFullPath}`);
+    info(`[DEBUG] cacheTimestampFileFullPath: ${cacheTimestampFileFullPath}`);
+  }
 
   let tootUrl;
   let tootCreated = false;
@@ -205,6 +267,11 @@ const processFeed = async (feedUrl) => {
   let firstRunWithIgnoredItems = false;
   if (existsSync(cacheFileFullPath)) {
     jsonCache = require(cacheFileFullPath);
+    if (debugMode) {
+      info(`[DEBUG] jsonCache:
+${JSON.stringify(jsonCache, null, 2)}
+`);
+    }
   } else {
     if (ignoreFirstRun) {
       info("Initializing the cache files without creating any toot");
@@ -276,12 +343,18 @@ const processFeed = async (feedUrl) => {
     // Keep only recent items that have been POSSEd the less
     const candidates = itemsPerTimes[minTimes];
 
+    if (debugMode) {
+      info(`[DEBUG] candidates:
+${JSON.stringify(candidates, null, 2)}
+`);
+    }
+
     const itemToPosse =
       candidates[Math.floor(Math.random() * candidates.length)];
 
     try {
       info(`Creating toot for item "${itemToPosse.title}"`);
-      if (logFeedItemContent) {
+      if (logFeedItemContent || debugMode) {
         info("Item content:");
         info(JSON.stringify(itemToPosse, null, 2));
       }
