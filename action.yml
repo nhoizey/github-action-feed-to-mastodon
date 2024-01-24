@@ -48,5 +48,5 @@ outputs:
   tootUrl: # output will be available to next steps
     description: "URL to the latest toot created"
 runs:
-  using: "node16"
+  using: "node20"
   main: "dist/index.js"
