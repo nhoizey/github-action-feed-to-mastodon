@@ -87,6 +87,9 @@ ${JSON.stringify(imagesAttachments, null, 2)}
               // Download the image file
               await download(attachment.url, imageFile);
             } catch (error) {
+              debug(`Error:
+${JSON.stringify(error, null, 2)}
+`);
               throw new Error(
                 `Error while trying to download ${attachment.url}: ${error.message}`
               );
@@ -106,6 +109,9 @@ ${JSON.stringify(imagesAttachments, null, 2)}
               });
               return media.id;
             } catch (error) {
+              debug(`Error:
+        ${JSON.stringify(error, null, 2)}
+        `);
               throw new Error(
                 `Error while trying to upload attachment ${attachment.url} to Mastodon: ${error.message}`
               );
@@ -126,6 +132,9 @@ ${JSON.stringify(imagesAttachments, null, 2)}
       debug(`Creating toot on Mastodon`);
       tootResult = await MastodonClient.statuses.create(toot);
     } catch (error) {
+      debug(`Error:
+${JSON.stringify(error, null, 2)}
+`);
       throw new Error(
         `Error while trying to create toot on Mastodon: ${error.message}`
       );
@@ -133,6 +142,9 @@ ${JSON.stringify(imagesAttachments, null, 2)}
 
     return tootResult && tootResult.uri;
   } catch (error) {
+    debug(`Error:
+${JSON.stringify(error, null, 2)}
+`);
     throw new Error(error);
   }
 };
