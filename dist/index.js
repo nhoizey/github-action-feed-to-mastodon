@@ -127,18 +127,8 @@ ${JSON.stringify(error, null, 2)}
       }
     }
 
-    let tootResult;
-    try {
-      debug(`Creating toot on Mastodon`);
-      tootResult = await MastodonClient.statuses.create(toot);
-    } catch (error) {
-      debug(`Error:
-${JSON.stringify(error, null, 2)}
-`);
-      throw new Error(
-        `Error while trying to create toot on Mastodon: ${error.message}`
-      );
-    }
+    debug(`Creating toot on Mastodon`);
+    const tootResult = await MastodonClient.statuses.create(toot);
 
     return tootResult && tootResult.uri;
   } catch (error) {
