@@ -162,6 +162,11 @@ Here's an example JSON feed with one single item, with only the properties that 
   ]
 }
 ```
+## Debugging
+
+If you want to see what's happening in the action, you can enable additional
+debug logs: [Enabling step debug logging](https://docs.github.com/en/actions/monitoring-and-troubleshooting-workflows/enabling-debug-logging#enabling-step-debug-logging)
+
 
 ## License
 
