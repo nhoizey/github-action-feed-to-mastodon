@@ -27,6 +27,12 @@ const createToot = async (tootData) => {
   const tootVisibility = getInput("tootVisiblity");
   const debugMode = getBooleanInput("debugMode");
 
+  if (debugMode) {
+    info(`[DEBUG] testMode: ${testMode}`);
+    info(`[DEBUG] tootVisibility: ${tootVisibility}`);
+    info(`[DEBUG] debugMode: ${debugMode}`);
+  }
+
   if (testMode) {
     warning("Running in test mode");
   }
