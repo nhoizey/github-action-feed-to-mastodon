@@ -35,7 +35,7 @@ const createToot = async (tootData) => {
   debug(`tootVisibility: ${tootVisibility}`);
 
   if (testMode) {
-    warning("Running in test mode");
+    warning("Running in test mode: @ will be replaced by $ in toot content.");
   }
 
   try {
@@ -119,15 +119,15 @@ ${JSON.stringify(error, null, 2)}
           })
         );
 
-        debug(
-          `uploadedImages: ${JSON.stringify(uploadedImages, null, 2)}`
-        );
+        debug(`uploadedImages: ${JSON.stringify(uploadedImages, null, 2)}`);
 
         toot.mediaIds = uploadedImages;
       }
     }
 
-    debug(`Creating toot on Mastodon`);
+    debug(`Creating toot on Mastodon:
+${JSON.stringify(toot, null, 2)}
+`);
     const tootResult = await MastodonClient.statuses.create(toot);
 
     return tootResult && tootResult.uri;
@@ -207,7 +207,15 @@ const { existsSync, writeFileSync } = __nccwpck_require__(7147);
 const path = __nccwpck_require__(9411);
 
 // Third party dependencies
-const { getInput, getBooleanInput, info, debug } = __nccwpck_require__(2186);
+const {
+  getInput,
+  getBooleanInput,
+  info,
+  debug,
+  isDebug,
+  startGroup,
+  endGroup,
+} = __nccwpck_require__(2186);
 const { mkdirP } = __nccwpck_require__(7436);
 const fetch = __nccwpck_require__(467);
 
@@ -235,17 +243,17 @@ const processFeed = async (feedUrl) => {
     cacheTimestampFile
   );
 
-    debug(`mastodonInstance: ${mastodonInstance}`);
-    debug(`nbTootsPerItem: ${nbTootsPerItem}`);
-    debug(`delayTootsSameItem: ${delayTootsSameItem}`);
-    debug(`cacheDirectory: ${cacheDirectory}`);
-    debug(`cacheFile: ${cacheFile}`);
-    debug(`cacheTimestampFile: ${cacheTimestampFile}`);
-    debug(`ignoreFirstRun: ${ignoreFirstRun}`);
-    debug(`logFeedItemContent: ${logFeedItemContent}`);
-    debug(`cacheDirectoryFullPath: ${cacheDirectoryFullPath}`);
-    debug(`cacheFileFullPath: ${cacheFileFullPath}`);
-    debug(`cacheTimestampFileFullPath: ${cacheTimestampFileFullPath}`);
+  debug(`mastodonInstance: ${mastodonInstance}`);
+  debug(`nbTootsPerItem: ${nbTootsPerItem}`);
+  debug(`delayTootsSameItem: ${delayTootsSameItem}`);
+  debug(`cacheDirectory: ${cacheDirectory}`);
+  debug(`cacheFile: ${cacheFile}`);
+  debug(`cacheTimestampFile: ${cacheTimestampFile}`);
+  debug(`ignoreFirstRun: ${ignoreFirstRun}`);
+  debug(`logFeedItemContent: ${logFeedItemContent}`);
+  debug(`cacheDirectoryFullPath: ${cacheDirectoryFullPath}`);
+  debug(`cacheFileFullPath: ${cacheFileFullPath}`);
+  debug(`cacheTimestampFileFullPath: ${cacheTimestampFileFullPath}`);
 
   let tootUrl;
   let tootCreated = false;
@@ -256,9 +264,11 @@ const processFeed = async (feedUrl) => {
   let firstRunWithIgnoredItems = false;
   if (existsSync(cacheFileFullPath)) {
     jsonCache = require(cacheFileFullPath);
-      debug(`jsonCache:
-${JSON.stringify(jsonCache, null, 2)}
-`);
+    if (isDebug()) {
+      startGroup("jsonCache");
+      debug(JSON.stringify(jsonCache, null, 2));
+      endGroup();
+    }
   } else {
     if (ignoreFirstRun) {
       info("Initializing the cache files without creating any toot");
@@ -330,21 +340,21 @@ ${JSON.stringify(jsonCache, null, 2)}
     // Keep only recent items that have been POSSEd the less
     const candidates = itemsPerTimes[minTimes];
 
-      debug(`candidates:
-${JSON.stringify(candidates, null, 2)}
-`);
+    if (isDebug()) {
+      startGroup("Candidates");
+      debug(JSON.stringify(candidates, null, 2));
+      endGroup();
+    }
 
     const itemToPosse =
       candidates[Math.floor(Math.random() * candidates.length)];
 
     try {
       info(`Creating toot for item "${itemToPosse.title}"`);
-      if (logFeedItemContent) {
+      if (logFeedItemContent || isDebug()) {
         info("Item content:");
         info(JSON.stringify(itemToPosse, null, 2));
       }
-      debug(`Item content:
-${JSON.stringify(itemToPosse, null, 2)}`);
 
       tootUrl = await createToot(itemToPosse);
       // TODO: better test?
