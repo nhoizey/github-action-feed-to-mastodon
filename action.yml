@@ -45,7 +45,7 @@ inputs:
     description: "Log the content of the feed item that will be used to create the toot"
     default: false
   instanceType:
-    description: "Type of Mastodon instance, to adapt API calls (values: "mastodon" or "pixelfed")"
+    description: "Type of Mastodon instance, to adapt API calls (values: \"mastodon\" or \"pixelfed\")"
     default: "mastodon"
 outputs:
   tootUrl: # output will be available to next steps
