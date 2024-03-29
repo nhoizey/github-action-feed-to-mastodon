@@ -374,7 +374,7 @@ const processFeed = async (feedUrl) => {
 
     // Keep only recent items that have been POSSEd the less, and sort them by last toot timestamp, the most recent first
     const candidates = itemsPerTimes[minTimes].sort(
-      (a, b) => b.lastTootTimestamp - a.lastTootTimestamp
+      (a, b) => Date.parse(b.date_published) - Date.parse(a.date_published)
     );
 
     const candidatesCount = candidates.length;
