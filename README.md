@@ -78,6 +78,7 @@ There are 3 required **inputs**, used in the examples above, but also some optio
 | `mastodonInstance`   |  **Yes**  |                                     | The root URL of the Mastodon instance where the toot should be created                                                                                                                                                                                                           |
 | `mastodonToken`      |  **Yes**  |                                     | Your access token for the Mastodon API, get it from `/settings/applications/new` on your instance, and use an [encrypted secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets) to hide it                                                               |
 | `nbTootsPerItem`     |    No     |                                   1 | Number of toots that can be created from the same item                                                                                                                                                                                                                           |
+| `itemChoiceStrategy`     |    No     |                                   `"random"` | Strategy to choose the item to toot when multiple are available in the list of **least tooted items**. The following values can be used: `"random"`, `"latest"` (the most recent item), `"oldest"` (the oldest item)                                                                                                                                                                                                                           |
 | `globalDelayToots`   |    No     |                        1440 (1 day) | Delay (in minutes) between any toot from this feed                                                                                                                                                                                                                               |
 | `delayTootsSameItem` |    No     |                    129600 (90 days) | Delay (in minutes) between any toot for the same item from this feed (used only if `nbTootsPerItem > 1`)                                                                                                                                                                         |
 | `cacheDirectory`     |    No     |                           `"cache"` | Path to the directory where cache files are stored                                                                                                                                                                                                                               |
@@ -111,13 +112,10 @@ There are 2 JSON files in the cache:
 
 The cache prevents creating the same toot multiple times if you set `nbTootsPerItem` to 1 (which is the default).
 
-If you set `nbTootsPerItem` to a value larger than 1, the action will randomly chose an item among the ones that have the least toots.
+If you set `nbTootsPerItem` to a value larger than 1, the action will chose an item among the ones that have the least toots. The choice is based on the `itemChoiceStrategy` input.
 
 > [!TIP]
 > Once [issue #7](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/7) fixed, you'll be able to set `nbTootsPerItem` to `-1` to remove any limit.
-
-> [!TIP]
-> Once [issue #14](https://github.com/nhoizey/github-action-jsonfeed-to-mastodon/issues/14) fixed, you'll be able to define other choice strategies.
 
 In particular, any new item in the feed won't have existing toots, so it will be tooted first when the action runs, if all previous items already have at least one toot.
 

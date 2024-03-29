@@ -17,6 +17,9 @@ inputs:
   nbTootsPerItem:
     description: "Number of toots that can be created from the same item"
     default: 1
+  itemChoiceStrategy:
+    description: "Strategy to choose the item to toot when multiple are available (default: \"random\"; values: \"oldest\", \"newest\", \"random\")"
+    default: "random"
   globalDelayToots:
     description: "Delay (in minutes) between any toot from this feed (default: 1 day)"
     default: 1440
