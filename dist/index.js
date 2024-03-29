@@ -391,6 +391,7 @@ const processFeed = async (feedUrl) => {
         itemToPosse = candidates[candidatesCount - 1];
         break;
       case "newest":
+      case "latest":
         itemToPosse = candidates[0];
         break;
       case "random":
