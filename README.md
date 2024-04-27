@@ -171,6 +171,10 @@ An (undocumentated) difference is that the `visibility` option is not supported,
 
 If you want to use this action with a Pixelfed instance, you have to set the optional `instanceType` input to `"pixelfed"`.
 
+ ## Usage with WordPress
+
+ Read the [dedicated docs](docs/wordpress.md).
+
 ## Debugging
 
 If you want to see what's happening in the action, you can enable additional
